@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: >-
+  If you use this mesh-generation pipeline in research, please cite this
+  software and the relevant STAR-CCM+, Nektar++ and Gmsh references.
+title: Nektar++ STAR-CCM+ Mesh Pipeline
+type: software
+authors:
+  - family-names: Wüstenberg
+    given-names: Henrik
+    orcid: https://orcid.org/0009-0008-3640-5399
+abstract: >-
+  A reproducible workflow for generating a linear tetrahedral/prismatic
+  external-aerodynamics mesh in STAR-CCM+, projecting it onto CAD and
+  converting it into a curved high-order Nektar++ mesh with NekMesh.
+license: MIT
+repository-code: https://github.com/hwuestenberg/nektar-star-pipeline
+url: https://github.com/hwuestenberg/nektar-star-pipeline
+keywords:
+  - computational fluid dynamics
+  - high-order mesh generation
+  - Nektar++
+  - NekMesh
+  - STAR-CCM+
+  - external aerodynamics

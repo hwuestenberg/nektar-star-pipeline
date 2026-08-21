@@ -1,0 +1,38 @@
+name: non-STAR validation
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa shfmt
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Check Python
+        run: |
+          ruff check scripts tests
+          python -m compileall -q scripts tests
+
+      - name: Check shell
+        run: |
+          shfmt -d -i 4 -ci execute.sh scripts/nektar/*.sh scripts/workflow/*.sh scripts/site/*.sh tests/*.sh
+          ./tests/test_cli.sh
+
+      - name: Run tests
+        run: pytest

@@ -1,0 +1,2 @@
+# Version used to generate and validate cad/naca0012_domain.step.
+gmsh==4.13.1
