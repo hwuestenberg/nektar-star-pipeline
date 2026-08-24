@@ -21,8 +21,12 @@ session_file="nektar/naca0012-periodic/session.xml"
 run_dir="nektar/naca0012-periodic/run"
 steps=100
 processes=1
+wall_shear_processes=1
 reynolds="${RANS_REYNOLDS:-684587.012}"
 force=false
+wall_shear=true
+wing_boundary=0
+wing_surface="${BL_SURFACE:-4}"
 
 usage() {
     cat <<'EOF'
@@ -40,6 +44,12 @@ Options:
   --reynolds RE     Override Reynolds; session uses U=1 and Kinvis=1/RE
                     (default: RANS_REYNOLDS from the case configuration)
   --np N            MPI ranks inside the container (default: 1)
+  --wall-shear-np N WSS FieldConvert ranks (default: 1, validated)
+                    Values >1 are experimental and rejected if non-finite
+  --no-wall-shear   Skip mean-field WSS post-processing
+  --wing-boundary N Nektar boundary ID for Wing (default: 0)
+  --wing-surface N  NekMesh composite ID for Wing
+                    (default: BL_SURFACE from case config, otherwise 4)
   --force           Replace an existing staged run
   -h, --help        Show this help
 
@@ -106,6 +116,34 @@ while (($#)); do
             processes="$2"
             shift 2
             ;;
+        --wall-shear-np)
+            [[ $# -ge 2 ]] || {
+                echo "--wall-shear-np requires a value" >&2
+                exit 2
+            }
+            wall_shear_processes="$2"
+            shift 2
+            ;;
+        --no-wall-shear)
+            wall_shear=false
+            shift
+            ;;
+        --wing-boundary)
+            [[ $# -ge 2 ]] || {
+                echo "--wing-boundary requires a value" >&2
+                exit 2
+            }
+            wing_boundary="$2"
+            shift 2
+            ;;
+        --wing-surface)
+            [[ $# -ge 2 ]] || {
+                echo "--wing-surface requires a value" >&2
+                exit 2
+            }
+            wing_surface="$2"
+            shift 2
+            ;;
         --force)
             force=true
             shift
@@ -146,6 +184,14 @@ done
     echo "--np must be a positive integer: $processes" >&2
     exit 2
 }
+[[ "$wall_shear_processes" =~ ^[1-9][0-9]*$ ]] || {
+    echo "--wall-shear-np must be a positive integer: $wall_shear_processes" >&2
+    exit 2
+}
+[[ "$wing_boundary" =~ ^[0-9]+$ && "$wing_surface" =~ ^[0-9]+$ ]] || {
+    echo "Wing boundary/surface IDs must be non-negative integers." >&2
+    exit 2
+}
 awk -v value="$reynolds" 'BEGIN { exit !(value > 0) }' || {
     echo "--reynolds must be positive: $reynolds" >&2
     exit 2
@@ -179,6 +225,8 @@ echo "Steps                : $steps"
 echo "Normalization        : U=1, rho=1, chord=1"
 echo "Reynolds / Kinvis    : $reynolds / $kinvis"
 echo "MPI ranks            : $processes"
+[[ "$wall_shear" != true ]] || \
+    echo "Wall-shear ranks     : $wall_shear_processes (serial is validated)"
 
 solver_log="$run_dir/solver.log"
 setsid env NEKTAR_SOLVER_WORKDIR="$run_dir" NEKTAR_SOLVER_NP="$processes" \
@@ -234,9 +282,16 @@ fi
     exit 1
 }
 checkpoint_path="$(find "$run_dir" -maxdepth 1 \
-    \( -type f -o -type d \) -name 'checkpoint_*.chk' -print -quit)"
+    \( -type f -o -type d \) \
+    \( -name 'checkpoint_*.chk' -o -name 'instantaneous_*.chk' \) \
+    -print | sort -V | tail -n 1)"
 [[ -n "$checkpoint_path" ]] || {
     echo "Checkpoint validation output is missing." >&2
+    exit 1
+}
+mean_field_path="$run_dir/mean_fields_avg.fld"
+[[ -e "$mean_field_path" ]] || {
+    echo "Final AverageFields output is missing: $mean_field_path" >&2
     exit 1
 }
 
@@ -244,6 +299,22 @@ echo "Nektar++ validation run completed."
 echo "Solver log          : $solver_log"
 echo "Wing forces         : $run_dir/wing_forces.fce"
 echo "Modal energy        : $run_dir/modal_energy.mdl"
+echo "Time-averaged field : $mean_field_path"
 find "$run_dir" -maxdepth 1 \( -type f -o -type d \) \
     \( -name '*.chk' -o -name '*.fld' \) \
     -printf 'Checkpoint/restart  : %p\n' | sort
+
+if [[ "$wall_shear" == true ]]; then
+    echo "Computing mean wing wall shear stress."
+    "$project_dir/scripts/workflow/postprocess_wall_shear.sh" \
+        --mesh "$mesh_file" \
+        --session "$session_file" \
+        --field "$mean_field_path" \
+        --output-dir "$run_dir" \
+        --prefix mean_fields_wss \
+        --boundary "$wing_boundary" \
+        --surface "$wing_surface" \
+        --reynolds "$reynolds" \
+        --np "$wall_shear_processes" \
+        --force
+fi

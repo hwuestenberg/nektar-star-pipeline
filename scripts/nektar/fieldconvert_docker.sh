@@ -9,6 +9,7 @@ source "$script_dir/container_images.sh"
 
 nektar_image="${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}"
 container_runtime="${NEKTAR_CONTAINER_RUNTIME:-auto}"
+fieldconvert_processes="${NEKTAR_FIELDCONVERT_NP:-1}"
 
 if (($# == 0)); then
     cat <<'EOF'
@@ -27,6 +28,11 @@ NEKTAR_CONTAINER_IMAGE:
 
   NEKTAR_CONTAINER_IMAGE=nektarpp/nektar:latest \
     scripts/nektar/fieldconvert_docker.sh -h
+
+Set NEKTAR_FIELDCONVERT_NP to run FieldConvert with MPI, for example:
+
+  NEKTAR_FIELDCONVERT_NP=16 \
+    scripts/nektar/fieldconvert_docker.sh -m wss:bnd=0 session.xml field.fld wss.fld
 EOF
     exit 2
 fi
@@ -34,6 +40,14 @@ fi
 if [[ "$nektar_image" == docker://* ]]; then
     echo "Image must not include the docker:// prefix: $nektar_image" >&2
     exit 2
+fi
+[[ "$fieldconvert_processes" =~ ^[1-9][0-9]*$ ]] || {
+    echo "NEKTAR_FIELDCONVERT_NP must be a positive integer: $fieldconvert_processes" >&2
+    exit 2
+}
+fieldconvert_command=(FieldConvert "$@")
+if ((fieldconvert_processes > 1)); then
+    fieldconvert_command=(mpirun -np "$fieldconvert_processes" "${fieldconvert_command[@]}")
 fi
 
 apptainer_executable="${APPTAINER_EXECUTABLE:-}"
@@ -62,12 +76,13 @@ case "$container_runtime" in
         }
         echo "FieldConvert runtime: Docker" >&2
         echo "Nektar++ image      : $nektar_image" >&2
+        echo "FieldConvert ranks  : $fieldconvert_processes" >&2
         exec docker run --rm \
             --user "$(id -u):$(id -g)" \
             --mount "type=bind,src=$project_dir,dst=/data" \
             --workdir /data \
             "$nektar_image" \
-            FieldConvert "$@"
+            "${fieldconvert_command[@]}"
         ;;
     apptainer)
         if [[ ! -x "$apptainer_executable" ]]; then
@@ -76,12 +91,13 @@ case "$container_runtime" in
         fi
         echo "FieldConvert runtime: Apptainer ($apptainer_executable)" >&2
         echo "Nektar++ image      : docker://$nektar_image" >&2
+        echo "FieldConvert ranks  : $fieldconvert_processes" >&2
         exec "$apptainer_executable" exec \
             --cleanenv \
             --bind "$project_dir:/data" \
             --pwd /data \
             "docker://$nektar_image" \
-            FieldConvert "$@"
+            "${fieldconvert_command[@]}"
         ;;
     *)
         echo "Unknown NEKTAR_CONTAINER_RUNTIME: $container_runtime" >&2

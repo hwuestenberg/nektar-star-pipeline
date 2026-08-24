@@ -114,8 +114,8 @@
     </CONDITIONS>
     <FILTERS>
         <FILTER TYPE="Checkpoint">
-            <PARAM NAME="OutputFile">checkpoint</PARAM>
-            <PARAM NAME="OutputFrequency">100</PARAM>
+            <PARAM NAME="OutputFile">instantaneous</PARAM>
+            <PARAM NAME="OutputFrequency">10</PARAM>
         </FILTER>
         <FILTER TYPE="AeroForces">
             <PARAM NAME="OutputFile">wing_forces</PARAM>
@@ -125,6 +125,11 @@
         <FILTER TYPE="ModalEnergy">
             <PARAM NAME="OutputFile">modal_energy</PARAM>
             <PARAM NAME="OutputFrequency">1</PARAM>
+        </FILTER>
+        <FILTER TYPE="AverageFields">
+            <PARAM NAME="OutputFile">mean_fields</PARAM>
+            <PARAM NAME="OutputFrequency">100</PARAM>
+            <PARAM NAME="SampleFrequency">  5 </PARAM>
         </FILTER>
     </FILTERS>
 </NEKTAR>

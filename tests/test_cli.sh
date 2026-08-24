@@ -16,6 +16,7 @@ commands=(
     scripts/workflow/run_star_bootstrap.sh
     scripts/workflow/run_star_rans.sh
     scripts/workflow/run_nektar_solver.sh
+    scripts/workflow/postprocess_wall_shear.sh
     scripts/workflow/clean_generated.sh
     scripts/workflow/run_resolution_study.sh
     scripts/workflow/cleanup_pipeline_outputs.sh
