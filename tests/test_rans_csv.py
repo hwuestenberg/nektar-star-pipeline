@@ -57,3 +57,39 @@ def test_zero_mean_pressure_conversion(tmp_path: Path) -> None:
         [1.0, 0.0, 0.0, 9.0, 1.0, 0.0, -1.0],
     ]
     assert "Pressure offset (Pa)   : 100" in completed.stdout
+
+
+def test_velocity_only_conversion_does_not_require_pressure(tmp_path: Path) -> None:
+    raw = tmp_path / "star_velocity.csv"
+    normalized = tmp_path / "nektar_velocity.csv"
+    raw.write_text(
+        "X [m],Y [m],Z [m],Velocity Component X [m/s],"
+        "Velocity Component Y [m/s],Velocity Component Z [m/s]\n"
+        "0,0,0,1,0,0\n"
+        "1,0,0,0.9,0.1,0\n",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(NORMALIZER),
+            str(raw),
+            str(normalized),
+            "--velocity-only",
+        ],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    with normalized.open(encoding="utf-8") as stream:
+        assert stream.readline().strip() == "# x,y,z,u,v,w"
+        rows = [[float(value) for value in row] for row in csv.reader(stream)]
+
+    assert rows == [
+        [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.9, 0.1, 0.0],
+    ]
+    assert "Pressure field         : omitted" in completed.stdout

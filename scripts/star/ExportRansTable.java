@@ -1,6 +1,7 @@
 // Simcenter STAR-CCM+ 20.04 batch macro.
 //
-// Save the converged simulation and export cell-centred x,y,z,u,v,w,p data.
+// Save the converged simulation and export cell-centred velocity data, with
+// pressure included only when STAR_RANS_EXPORT_PRESSURE is true.
 // scripts/nektar/normalize_star_rans_csv.py converts STAR's version-dependent column
 // labels into the CSV convention accepted by Nektar++ FieldConvert.
 package macro;
@@ -37,20 +38,25 @@ public class ExportRansTable extends StarMacro {
       throw new IllegalStateException(
           "STAR field function 'Velocity' is unavailable");
     }
-    FieldFunction pressure = functions.getFunction("Pressure");
-    if (pressure == null) {
-      throw new IllegalStateException("STAR field function 'Pressure' is unavailable");
-    }
+    boolean exportPressure = optionalBoolean("STAR_RANS_EXPORT_PRESSURE", true);
 
     XyzInternalTable table = simulation.getTableManager()
         .createTable(XyzInternalTable.class);
     table.setPresentationName("Nektar RANS initial-condition samples");
     table.getParts().setObjects(region);
-    table.setFieldFunctions(new ArrayList<>(Arrays.asList(
+    ArrayList<FieldFunction> tableFunctions = new ArrayList<>(Arrays.asList(
         velocityFunction.getComponentFunction(0),
         velocityFunction.getComponentFunction(1),
-        velocityFunction.getComponentFunction(2),
-        pressure)));
+        velocityFunction.getComponentFunction(2)));
+    if (exportPressure) {
+      FieldFunction pressure = functions.getFunction("Pressure");
+      if (pressure == null) {
+        throw new IllegalStateException(
+            "STAR field function 'Pressure' is unavailable");
+      }
+      tableFunctions.add(pressure);
+    }
+    table.setFieldFunctions(tableFunctions);
     table.extract();
     table.export(resolvePath(tablePath), ",");
 
@@ -94,6 +100,7 @@ public class ExportRansTable extends StarMacro {
     simulation.println("STAR batch RANS SIM      : " + simPath);
     simulation.println("STAR batch RANS table    : " + tablePath);
     simulation.println("STAR batch table bytes   : " + tableFile.length());
+    simulation.println("STAR batch pressure field: " + exportPressure);
     simulation.println("STAR_BATCH_RANS_EXPORT_COMPLETE");
   }
 
@@ -115,5 +122,21 @@ public class ExportRansTable extends StarMacro {
           + environmentName + ": " + file);
     }
     return file.getPath();
+  }
+
+  private boolean optionalBoolean(String environmentName, boolean fallback) {
+    String value = System.getenv(environmentName);
+    if (value == null || value.trim().isEmpty()) {
+      return fallback;
+    }
+    String normalized = value.trim().toLowerCase();
+    if (normalized.equals("true")) {
+      return true;
+    }
+    if (normalized.equals("false")) {
+      return false;
+    }
+    throw new IllegalArgumentException(
+        environmentName + " must be true or false: " + value);
   }
 }

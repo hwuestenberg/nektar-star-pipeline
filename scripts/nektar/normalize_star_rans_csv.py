@@ -96,7 +96,7 @@ def read_star_table(path: Path) -> tuple[list[str], list[list[str]]]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Normalize STAR cell-centre x,y,z,velocity,pressure data for FieldConvert."
+        description="Normalize STAR cell-centre data for FieldConvert."
     )
     parser.add_argument("input", type=Path, help="raw STAR XyzInternalTable CSV")
     parser.add_argument("output", type=Path, help="Nektar++ point-data CSV")
@@ -105,6 +105,11 @@ def parse_args() -> argparse.Namespace:
         choices=("keep", "subtract-first", "zero-mean"),
         default="keep",
         help="pressure gauge adjustment (default: keep STAR values)",
+    )
+    parser.add_argument(
+        "--velocity-only",
+        action="store_true",
+        help="write x,y,z,u,v,w and do not require a STAR pressure column",
     )
     for field in ("x", "y", "z", "u", "v", "w", "p"):
         parser.add_argument(
@@ -116,9 +121,12 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     headers, raw_rows = read_star_table(args.input)
+    output_fields = ["x", "y", "z", "u", "v", "w"]
+    if not args.velocity_only:
+        output_fields.append("p")
     indices = {
         field: find_column(headers, field, getattr(args, f"{field}_column"))
-        for field in ("x", "y", "z", "u", "v", "w", "p")
+        for field in output_fields
     }
 
     values: list[list[float]] = []
@@ -129,7 +137,7 @@ def main() -> int:
         try:
             record = [
                 float(row[indices[field]].strip())
-                for field in ("x", "y", "z", "u", "v", "w", "p")
+                for field in output_fields
             ]
         except ValueError as error:
             raise ValueError(
@@ -143,18 +151,20 @@ def main() -> int:
     if not values:
         raise ValueError("STAR table contains no data rows")
 
-    if args.pressure_mode == "subtract-first":
-        pressure_offset = values[0][6]
-    elif args.pressure_mode == "zero-mean":
-        pressure_offset = statistics.fmean(record[6] for record in values)
-    else:
-        pressure_offset = 0.0
-    for record in values:
-        record[6] -= pressure_offset
+    pressure_offset: float | None = None
+    if not args.velocity_only:
+        if args.pressure_mode == "subtract-first":
+            pressure_offset = values[0][6]
+        elif args.pressure_mode == "zero-mean":
+            pressure_offset = statistics.fmean(record[6] for record in values)
+        else:
+            pressure_offset = 0.0
+        for record in values:
+            record[6] -= pressure_offset
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("w", newline="", encoding="utf-8") as stream:
-        stream.write("# x,y,z,u,v,w,p\n")
+        stream.write(f"# {','.join(output_fields)}\n")
         writer = csv.writer(stream, lineterminator="\n")
         writer.writerows(
             [[format(value, ".17g") for value in record] for record in values]
@@ -163,7 +173,10 @@ def main() -> int:
     print(f"STAR rows              : {len(values)}")
     print(f"STAR columns           : {headers}")
     print(f"Nektar column indices  : {indices}")
-    print(f"Pressure offset (Pa)   : {pressure_offset:.17g}")
+    if pressure_offset is not None:
+        print(f"Pressure offset (Pa)   : {pressure_offset:.17g}")
+    else:
+        print("Pressure field         : omitted")
     print(f"Nektar point-data CSV  : {args.output}")
     return 0
 
