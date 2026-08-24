@@ -127,11 +127,14 @@ module serialization uses private temporary XMLs which are removed on return.
 If the configured template is absent, the first run bootstraps it from
 `STAR_STEP`; later runs reuse it.
 
-After a successful pipeline run, `execute.sh` prints a copy-paste-ready
-`run_nektar_solver.sh` command using the generated mesh/restart, configured
-Reynolds number, and optional `NEKTAR_SOLVER_NP` site setting. The solver
-driver then computes the mean Wing wall-shear vector and magnitude from the
-final `mean_fields_avg.fld` produced by the `AverageFields` filter. Conversion
+After producing the mesh and restart, `execute.sh` directly runs
+`run_nektar_solver.sh` using the configured Reynolds number,
+`NEKTAR_SOLVER_STEPS` and the single end-to-end `MPI_NP` rank count. The same
+rank count is passed to STAR meshing, STAR RANS, the Nektar++ solver and the
+parallel-capable surface post-processing operations. The solver driver then
+computes
+the mean Wing wall-shear vector and magnitude from the final
+`mean_fields_avg.fld` produced by the `AverageFields` filter. Conversion
 to skin-friction coefficient is deliberately left to downstream analysis. It
 also extracts the mean Wing pressure into FLD, CSV and high-order VTU outputs.
 The validated Nektar++ 5.10.0 WSS path is serial and performs an automatic

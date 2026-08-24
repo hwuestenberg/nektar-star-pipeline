@@ -17,9 +17,20 @@ def test_production_is_default_and_execute_forwards_diagnostics() -> None:
     assert "--diagnostic" in driver
     assert '[[ -s "$STAR_TEMPLATE" ]]' in execute
     assert 'pipeline_args+=("$@")' in execute
-    assert "pipeline completed. Run the Nektar++ simulation next" in execute
-    assert "run_nektar_solver.sh --force" in execute
-    assert 'NEKTAR_SOLVER_NP:-1' in execute
+    assert "starting Nektar++ solver" in execute
+    assert "run_nektar_solver.sh" in execute
+    assert "--wall-shear-np" in execute
+    assert 'processes="$MPI_NP"' in execute
+    assert '--star-np "$processes"' in execute
+    assert '--rans-np "$processes"' in execute
+    assert '--np "$processes"' in execute
+    assert '--wall-shear-np "$processes"' in execute
+    assert 'NEKTAR_SOLVER_STEPS:-100' in execute
+    assert 'NEKTAR_RUN_DIR:-nektar/naca0012-periodic/run' in execute
+    assert "STAR_NP" not in execute
+    assert "RANS_NP" not in execute
+    assert "NEKTAR_SOLVER_NP" not in execute
+    assert "NEKTAR_WALL_SHEAR_NP" not in execute
 
 
 def test_production_failure_prints_diagnostic_rerun_hint() -> None:

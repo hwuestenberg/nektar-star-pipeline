@@ -35,7 +35,7 @@ for environment_variable in \
 done
 
 required_variables=(
-    CASE_NAME STAR_TEMPLATE STAR_NP RANS_NP STAR_LICENSE_MODE
+    CASE_NAME STAR_TEMPLATE MPI_NP STAR_LICENSE_MODE
     PERIODIC_SURF1 PERIODIC_SURF2 PERIODIC_DIR
     PERIODIC_TRANSLATION_X PERIODIC_TRANSLATION_Y PERIODIC_TRANSLATION_Z
     STAR_PERIODIC_INTERFACE
@@ -50,13 +50,19 @@ for variable_name in "${required_variables[@]}"; do
     fi
 done
 
+processes="$MPI_NP"
+if [[ ! "$processes" =~ ^[1-9][0-9]*$ ]]; then
+    echo "MPI_NP must be a positive integer: $processes" >&2
+    exit 2
+fi
+
 pipeline_args=(
     --force
     --star-template "$STAR_TEMPLATE"
     --name "$CASE_NAME"
     --ccm-file "star/${CASE_NAME}_linear.ccm"
-    --star-np "$STAR_NP"
-    --rans-np "$RANS_NP"
+    --star-np "$processes"
+    --rans-np "$processes"
     --periodic-span
     --periodic-surf1 "$PERIODIC_SURF1"
     --periodic-surf2 "$PERIODIC_SURF2"
@@ -126,16 +132,41 @@ case "$STAR_LICENSE_MODE" in
         ;;
 esac
 
-solver_processes="${NEKTAR_SOLVER_NP:-1}"
-if [[ ! "$solver_processes" =~ ^[1-9][0-9]*$ ]]; then
-    echo "NEKTAR_SOLVER_NP must be a positive integer: $solver_processes" >&2
+solver_steps="${NEKTAR_SOLVER_STEPS:-100}"
+wing_boundary="${NEKTAR_WING_BOUNDARY:-0}"
+solver_session="${NEKTAR_SESSION:-nektar/naca0012-periodic/session.xml}"
+solver_run_dir="${NEKTAR_RUN_DIR:-nektar/naca0012-periodic/run}"
+if [[ ! "$solver_steps" =~ ^[1-9][0-9]*$ ]]; then
+    echo "NEKTAR_SOLVER_STEPS must be a positive integer: $solver_steps" >&2
     exit 2
 fi
+if [[ ! "$wing_boundary" =~ ^[0-9]+$ ]]; then
+    echo "NEKTAR_WING_BOUNDARY must be a non-negative integer: $wing_boundary" >&2
+    exit 2
+fi
+for path in "$solver_session" "$solver_run_dir"; do
+    [[ "$path" != /* && "$path" != *:* && "$path" != .. &&
+        "$path" != ../* && "$path" != */../* && "$path" != */.. ]] || {
+        echo "Nektar solver paths must be repository-relative: $path" >&2
+        exit 2
+    }
+done
 final_mesh="nekmesh/${CASE_NAME}_p${CAD_ORDER}_bl${BL_LAYERS}.xml"
 restart_field="nekmesh/${CASE_NAME}_rans_initial.fld"
 
-printf '\n[execute] pipeline completed. Run the Nektar++ simulation next:\n'
-printf '  ./scripts/workflow/run_nektar_solver.sh --force \\\n'
-printf '    --mesh %q \\\n' "$final_mesh"
-printf '    --restart %q \\\n' "$restart_field"
-printf '    --reynolds %q --np %q\n' "$RANS_REYNOLDS" "$solver_processes"
+printf '\n[execute] mesh/restart pipeline completed; starting Nektar++ solver\n'
+./scripts/workflow/run_nektar_solver.sh \
+    --force \
+    --mesh "$final_mesh" \
+    --restart "$restart_field" \
+    --session "$solver_session" \
+    --run-dir "$solver_run_dir" \
+    --steps "$solver_steps" \
+    --reynolds "$RANS_REYNOLDS" \
+    --np "$processes" \
+    --wall-shear-np "$processes" \
+    --wing-boundary "$wing_boundary" \
+    --wing-surface "$BL_SURFACE"
+
+printf '\n[execute] complete: mesh, restart, solver, WSS and pressure outputs validated\n'
+printf '[execute] run directory: %s\n' "$solver_run_dir"
