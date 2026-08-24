@@ -33,11 +33,9 @@ span_min_boundary="SpanMin"
 span_max_boundary="SpanMax"
 span_mode="symmetry"
 periodic_interface="SpanwisePeriodic"
-velocity_mps="10.0"
+reynolds="684587.012"
 angle_deg="0.0"
-density_kgm3="1.225"
-viscosity_pas="1.7894e-5"
-pressure_pa="0.0"
+reference_pressure="0.0"
 turb_intensity="0.01"
 turb_visc_ratio="10.0"
 max_steps=2000
@@ -64,11 +62,12 @@ Files:
   --provenance FILE      Reproducibility metadata
 
 Physics:
-  --velocity U           Freestream magnitude in m/s (default: 10)
+  --reynolds RE          Chord Reynolds number (default: 684587.012).
+                         The STAR values are fixed to U=1, rho=1, chord=1,
+                         and mu=nu=1/RE to match Nektar++ nondimensional data.
   --angle-deg A          Angle in the x-y plane (default: 0)
-  --density RHO          Constant density in kg/m^3 (default: 1.225)
-  --viscosity MU         Dynamic viscosity in Pa s (default: 1.7894e-5)
-  --pressure P           Downstream static gauge pressure in Pa (default: 0)
+  --pressure P           Nondimensional downstream reference pressure
+                         (default: 0)
   --turb-intensity I     Fraction, not percent (default: 0.01)
   --turb-visc-ratio R    Inlet turbulent/molecular viscosity ratio (default: 10)
   --max-steps N          Maximum steady iterations (default: 2000)
@@ -189,24 +188,16 @@ while (($#)); do
             periodic_interface="$2"
             shift 2
             ;;
-        --velocity)
-            velocity_mps="$2"
+        --reynolds)
+            reynolds="$2"
             shift 2
             ;;
         --angle-deg)
             angle_deg="$2"
             shift 2
             ;;
-        --density)
-            density_kgm3="$2"
-            shift 2
-            ;;
-        --viscosity)
-            viscosity_pas="$2"
-            shift 2
-            ;;
         --pressure)
-            pressure_pa="$2"
+            reference_pressure="$2"
             shift 2
             ;;
         --turb-intensity)
@@ -348,21 +339,17 @@ validate_real_number() {
     fi
 }
 for numeric_pair in \
-    "--velocity:$velocity_mps" \
+    "--reynolds:$reynolds" \
     "--angle-deg:$angle_deg" \
-    "--density:$density_kgm3" \
-    "--viscosity:$viscosity_pas" \
-    "--pressure:$pressure_pa" \
+    "--pressure:$reference_pressure" \
     "--turb-intensity:$turb_intensity" \
     "--turb-visc-ratio:$turb_visc_ratio"; do
     validate_real_number "${numeric_pair%%:*}" "${numeric_pair#*:}"
 done
 validate_real_number --residual-tol "$residual_tolerance"
-validate_number --velocity "$velocity_mps" 'value > 0'
+validate_number --reynolds "$reynolds" 'value > 0'
 validate_number --angle-deg "$angle_deg" 'value == value'
-validate_number --density "$density_kgm3" 'value > 0'
-validate_number --viscosity "$viscosity_pas" 'value > 0'
-validate_number --pressure "$pressure_pa" 'value == value'
+validate_number --pressure "$reference_pressure" 'value == value'
 validate_number --turb-intensity "$turb_intensity" 'value > 0 && value < 1'
 validate_number --turb-visc-ratio "$turb_visc_ratio" 'value > 0'
 validate_number --residual-tol "$residual_tolerance" 'value > 0'
@@ -414,7 +401,9 @@ configure_command=("$star_executable" -np "$processes" "${extra_star_args[@]}"
     -batch "$configure_macro" "$staged_sim")
 solve_command=("$star_executable" -np "$processes" "${extra_star_args[@]}"
     -batch "run,$export_macro" "$staged_sim")
-reynolds="$(awk -v rho="$density_kgm3" -v u="$velocity_mps" -v mu="$viscosity_pas" 'BEGIN { printf "%.9g", rho*u/mu }')"
+velocity_mps="1.0"
+density_kgm3="1.0"
+viscosity_pas="$(awk -v re="$reynolds" 'BEGIN { printf "%.17g", 1.0/re }')"
 
 echo "Input SIM      : $input_sim"
 echo "Output SIM     : $output_sim"
@@ -422,8 +411,10 @@ echo "Raw STAR table : $raw_table"
 echo "Nektar CSV     : $output_csv"
 echo "Batch log      : $log_file"
 echo "License mode   : $license_mode"
-echo "Freestream     : $velocity_mps m/s at $angle_deg deg"
-echo "Re(c=1 m)      : $reynolds"
+echo "Normalization  : U=1, rho=1, chord=1"
+echo "Freestream     : U=1 at $angle_deg deg"
+echo "Re             : $reynolds"
+echo "mu = nu = 1/Re: $viscosity_pas"
 echo "Maximum steps  : $max_steps"
 echo "Minimum steps  : $min_steps"
 echo "Residual tol.  : $residual_tolerance (all active residuals)"
@@ -456,11 +447,9 @@ export STAR_RANS_SPAN_MIN_BOUNDARY="$span_min_boundary"
 export STAR_RANS_SPAN_MAX_BOUNDARY="$span_max_boundary"
 export STAR_RANS_SPAN_MODE="$span_mode"
 export STAR_RANS_PERIODIC_INTERFACE="$periodic_interface"
-export STAR_RANS_VELOCITY_MPS="$velocity_mps"
+export STAR_RANS_REYNOLDS="$reynolds"
 export STAR_RANS_ANGLE_DEG="$angle_deg"
-export STAR_RANS_DENSITY_KGM3="$density_kgm3"
-export STAR_RANS_VISCOSITY_PAS="$viscosity_pas"
-export STAR_RANS_PRESSURE_PA="$pressure_pa"
+export STAR_RANS_REFERENCE_PRESSURE="$reference_pressure"
 export STAR_RANS_TURB_INTENSITY="$turb_intensity"
 export STAR_RANS_TURB_VISC_RATIO="$turb_visc_ratio"
 export STAR_RANS_MAX_STEPS="$max_steps"
@@ -597,9 +586,10 @@ final_iteration="$(awk -F: '/STAR batch final iteration/ {gsub(/[[:space:]]/, ""
     printf 'input_sim_sha256=%s\n' "$(sha256sum "$input_sim" | awk '{print $1}')"
     printf 'configure_macro_sha256=%s\n' "$(sha256sum "$configure_macro" | awk '{print $1}')"
     printf 'export_macro_sha256=%s\n' "$(sha256sum "$export_macro" | awk '{print $1}')"
-    printf 'velocity_mps=%s\nangle_deg=%s\ndensity_kgm3=%s\nviscosity_pas=%s\n' \
-        "$velocity_mps" "$angle_deg" "$density_kgm3" "$viscosity_pas"
-    printf 'chord_reynolds=%s\npressure_pa=%s\n' "$reynolds" "$pressure_pa"
+    printf 'nondimensional_velocity=%s\nangle_deg=%s\nnondimensional_density=%s\n' \
+        "$velocity_mps" "$angle_deg" "$density_kgm3"
+    printf 'reynolds=%s\nnondimensional_kinematic_viscosity=%s\nreference_pressure=%s\n' \
+        "$reynolds" "$viscosity_pas" "$reference_pressure"
     printf 'turbulence_intensity=%s\nturbulent_viscosity_ratio=%s\n' "$turb_intensity" "$turb_visc_ratio"
     printf 'maximum_steps=%s\nminimum_steps=%s\nresidual_tolerance=%s\npressure_mode=%s\n' \
         "$max_steps" "$min_steps" "$residual_tolerance" "$pressure_mode"
