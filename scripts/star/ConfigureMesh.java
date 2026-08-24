@@ -81,8 +81,19 @@ public class ConfigureMesh extends StarMacro {
         volumeYMin, volumeYMax,
         volumeZMin, volumeZMax);
 
-    VolumeCustomMeshControl volumeControl = (VolumeCustomMeshControl) operation
-        .getCustomMeshControls().getObject(volumeControlName);
+    // In STAR 20.04, getObject(name) reports a server error and aborts the
+    // macro when a custom control is absent; it does not safely return null.
+    // The refinement control is intentionally optional in a fresh template,
+    // so inspect the manager's children before creating it.
+    VolumeCustomMeshControl volumeControl = null;
+    for (Object control : operation.getCustomMeshControls().getChildren()) {
+      if (control instanceof VolumeCustomMeshControl
+          && volumeControlName.equals(
+              ((VolumeCustomMeshControl) control).getPresentationName())) {
+        volumeControl = (VolumeCustomMeshControl) control;
+        break;
+      }
+    }
     if (volumeControl == null) {
       volumeControl = operation.getCustomMeshControls().createVolumeControl();
       volumeControl.setPresentationName(volumeControlName);
