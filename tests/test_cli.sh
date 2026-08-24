@@ -13,7 +13,10 @@ bash -n \
 commands=(
     scripts/workflow/run_remote_pipeline.sh
     scripts/workflow/run_star_mesh.sh
+    scripts/workflow/run_star_bootstrap.sh
     scripts/workflow/run_star_rans.sh
+    scripts/workflow/run_nektar_solver.sh
+    scripts/workflow/clean_generated.sh
     scripts/workflow/run_resolution_study.sh
     scripts/workflow/cleanup_pipeline_outputs.sh
     scripts/site/sync_to_remote.sh

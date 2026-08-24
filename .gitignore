@@ -24,6 +24,7 @@ star/*.ccm
 star/*.log
 star/*.provenance.txt
 star/.star-stage.*/
+star/.star-bootstrap.*/
 star/.star-rans-stage.*/
 star/*_rans_raw.csv
 star/*_rans_nektar.csv
@@ -32,3 +33,4 @@ nekmesh/*.xml
 nekmesh/*.fld
 nekmesh/*.vtu
 nekmesh/*.vtk
+nektar/*/run/
