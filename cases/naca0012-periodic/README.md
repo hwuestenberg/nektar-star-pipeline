@@ -15,12 +15,14 @@ ${EDITOR:-vi} config/site.env
 The numerical composite identifiers in `case.env` match the scripted
 STEP-to-SIM bootstrap (`SpanMin=C[6]`, `SpanMax=C[8]`, `Wing=C[4]`). A GUI
 prepared template may export another ordering and must override these values.
-The pipeline's periodic preflight must pass before the span identifiers are
-accepted.
+Diagnostic mode uses a disposable periodic preflight. The default production
+path omits that duplicate pass and validates the retained final
+`peralign:orient` result instead.
 
-By default `STAR_STEP` in the site configuration makes the pipeline generate
-the ignored STAR `.sim` template directly from the tracked STEP file. Clear
-`STAR_STEP` to use an existing prepared template instead. The bootstrap macro
+When the configured template is absent, `STAR_STEP` makes the pipeline
+generate the ignored STAR `.sim` template directly from the tracked STEP file.
+Subsequent production runs reuse it. Clear `STAR_STEP` to require an existing
+prepared template instead. The bootstrap macro
 has been API-compiled and run under STAR 20.04. It creates the mesh-only
 periodic part-surface contact as well as the region interface so the
 parts-based remesher can generate a one-to-one span pair.

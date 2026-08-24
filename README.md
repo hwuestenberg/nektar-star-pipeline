@@ -120,6 +120,30 @@ After configuring the local STAR installation:
 ./execute.sh
 ```
 
+`execute.sh` selects the lean production DAG. It reuses an existing validated
+STAR template, overlaps STAR RANS with high-order mesh generation, retains one
+final periodic/Jacobian gate, and omits diagnostic VTUs. Required NekMesh
+module serialization uses private temporary XMLs which are removed on return.
+If the configured template is absent, the first run bootstraps it from
+`STAR_STEP`; later runs reuse it.
+
+After a successful pipeline run, `execute.sh` prints a copy-paste-ready
+`run_nektar_solver.sh` command using the generated mesh/restart, configured
+Reynolds number, and optional `NEKTAR_SOLVER_NP` site setting. The solver
+driver then computes the mean Wing wall-shear vector and magnitude from the
+final `mean_fields_avg.fld` produced by the `AverageFields` filter. Conversion
+to skin-friction coefficient is deliberately left to downstream analysis. It
+also extracts the mean Wing pressure into FLD, CSV and high-order VTU outputs.
+The validated Nektar++ 5.10.0 WSS path is serial and performs an automatic
+finite-norm audit before publishing the result; on the reference production
+mesh this is a substantial, memory-intensive post-process. Use
+`--no-wall-shear` for solver-only smoke tests.
+
+For tutorial checkpoints and visual exports, invoke
+`./execute.sh --diagnostic`, or add `--diagnostic` when invoking
+`scripts/workflow/run_remote_pipeline.sh` directly. Every failed production
+run prints this diagnostic rerun hint.
+
 To discard all reproducible outputs before a clean run, preview and then
 execute the generated-artifact cleanup:
 

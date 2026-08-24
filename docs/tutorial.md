@@ -332,7 +332,7 @@ the mesh-only CCM export:
 ```text
 STAR mesh ---------------------------> mesh-only CCM -> NekMesh
     |
-    +-> steady SST RANS -> x,y,z,u,v,w,p samples ----> FieldConvert -> .fld
+    +-> steady SST RANS -> x,y,z,u,v,w[,p] samples --> FieldConvert -> .fld
 ```
 
 Keeping the two outputs separate is intentional. NekMesh reads CCM here as a
@@ -761,8 +761,9 @@ have been removed; delete them from older local `config/site.env` files.
 
 ## Remote end-to-end pipeline
 
-`scripts/workflow/run_remote_pipeline.sh` chains the validated stages and stops at the
-first failure:
+`scripts/workflow/run_remote_pipeline.sh` has production and diagnostic
+profiles. Production is the default. Pass `--diagnostic` to chain the
+validated tutorial checkpoints below, stopping at the first failure:
 
 ```text
 STAR mesh + mesh-only CCM export
@@ -821,6 +822,26 @@ The provenance file records timestamps, host, non-secret license mode,
 container image digests, and SHA-256 hashes from STEP through final XML/VTU.
 The first Apptainer invocation can take longer because it must populate the
 user's image cache.
+
+The default production path used by `execute.sh`:
+
+- CAD projection, prism splitting and `peralign:orient` retain their validated
+  XML serialization boundaries. The intermediate XMLs live in a private
+  temporary directory and are deleted after the final Jacobian gate;
+- STAR RANS and NekMesh run concurrently after STAR publishes the meshed SIM
+  and CCM;
+- all diagnostic VTUs, the periodic preflight, intermediate XML files and the
+  pre-split Jacobian audit are omitted;
+- RANS exports and interpolates only `u,v,w`, since the committed solver
+  session initializes pressure independently;
+- a validated STAR template is reused instead of being bootstrapped again.
+
+The production ordering deliberately remains
+`projectcad -> bl -> peralign:orient -> projectcad -> jac`. Removing the first
+projection requires a separate A/B geometry and Jacobian validation.
+If production fails, the driver prints `./execute.sh --diagnostic`; that rerun
+restores intermediate XMLs, VTUs, the periodic preflight and detailed quality
+logs for diagnosis.
 
 After validating and archiving a completed case, preview removal of its
 reproducible intermediates with:

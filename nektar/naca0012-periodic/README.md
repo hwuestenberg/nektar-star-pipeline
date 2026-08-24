@@ -42,3 +42,50 @@ ranks. That structural validation used the preceding donor scaling; rerun the
 full STAR transfer before claiming the new `U=1` normalization as exercised.
 A 48-rank decomposition failed in the first pressure solve, so 32 ranks is the
 currently validated decomposition for this tutorial mesh.
+
+## Wing skin friction
+
+After the solver passes its force, modal-energy, checkpoint and averaged-field
+checks, `run_nektar_solver.sh` post-processes the final `mean_fields_avg.fld`
+from the `AverageFields` filter on Wing (`B[0]`, `C[4]`) with FieldConvert's
+`wss` module. It writes:
+
+```text
+run/wing_surface.xml
+run/mean_fields_wss.fld
+run/mean_fields_wss.csv
+run/mean_fields_wss.vtu
+run/mean_fields_pressure.fld
+run/mean_fields_pressure.csv
+run/mean_fields_pressure.vtu
+```
+
+The surface field contains the native `wss` output: `Shear_x`, `Shear_y`,
+`Shear_z` and `Shear_mag`. Skin-friction normalization is deliberately left to
+downstream analysis. A parallel `extract:bnd=0` also extracts the Wing
+boundary from `mean_fields_avg.fld`; the published pressure field retains only
+`p`. The expensive `wss` and `extract` modules use the requested MPI rank
+count. Their finite audits, pressure field selection, and all CSV/high-order-
+VTU exports run on one rank. Pass `--no-wall-shear` to skip this post-process or run
+`scripts/workflow/postprocess_wall_shear.sh` directly for another
+field/checkpoint. The expensive volume-field reconstruction in `wss` is
+serial by default: Nektar++ 5.10.0 produced partition-dependent non-finite
+boundary values in MPI for this hybrid mesh. A finite-norm audit prevents such
+fields from being published. `--wall-shear-np N` is available for retesting a
+newer image, but `N=1` is the validated setting. The extracted surface field is
+written as one portable `.fld`.
+
+Plot the native mean shear magnitude and pressure against chordwise position
+with:
+
+```bash
+python3 scripts/nektar/plot_surface_fields.py \
+  nektar/naca0012-periodic/run/mean_fields_wss.csv \
+  nektar/naca0012-periodic/run/mean_fields_pressure.csv
+```
+
+This writes separate `mean_fields_wss.png` and `mean_fields_pressure.png`
+figures beside the CSV files. Upper and lower surfaces are shown separately;
+repeated points at each `x/c` station are averaged only in the spanwise
+direction. Use `--chord` and `--leading-edge-x` for geometry whose chord does
+not run from `x=0` to `x=1`.
