@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Immutable OCI images validated for this STAR -> NekMesh tutorial.
+# Immutable full Nektar++ OCI image used by every Nektar++ executable.
 
-NEKMESH_IMAGE_DEFAULT="nektarpp/nekmesh@sha256:2187fd1ecb94d2fee4eaa478b232779b8d5bd354eff811beafbc71c3b6adf68b"
-FIELDCONVERT_IMAGE_DEFAULT="nektarpp/nektar@sha256:ea6caaa177e163f554769580f4bc200e9785b2b588520afad985654f556397a2"
+NEKTAR_RELEASE_DEFAULT="v5.10.0"
+NEKTAR_IMAGE_DEFAULT="nektarpp/nektar@sha256:2ae26f90b902742b7b2a7e6c9a18542b171e654a26f54b9944ab636d24da3748"

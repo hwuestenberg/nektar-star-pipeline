@@ -7,7 +7,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
 source "$script_dir/container_images.sh"
 
-fieldconvert_image="${FIELDCONVERT_CONTAINER_IMAGE:-${FIELDCONVERT_DOCKER_IMAGE:-$FIELDCONVERT_IMAGE_DEFAULT}}"
+nektar_image="${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}"
 container_runtime="${NEKTAR_CONTAINER_RUNTIME:-auto}"
 
 if (($# == 0)); then
@@ -22,17 +22,17 @@ Examples:
 Paths passed to FieldConvert must be relative to the tutorial root. The root
 is mounted at /data inside the container. Docker is preferred when installed;
 otherwise Apptainer is used. Override the runtime with
-NEKTAR_CONTAINER_RUNTIME and the pinned image with
-FIELDCONVERT_CONTAINER_IMAGE (FIELDCONVERT_DOCKER_IMAGE remains an alias):
+NEKTAR_CONTAINER_RUNTIME and the pinned full image with
+NEKTAR_CONTAINER_IMAGE:
 
-  FIELDCONVERT_DOCKER_IMAGE=nektarpp/nektar:latest \
+  NEKTAR_CONTAINER_IMAGE=nektarpp/nektar:latest \
     scripts/nektar/fieldconvert_docker.sh -h
 EOF
     exit 2
 fi
 
-if [[ "$fieldconvert_image" == docker://* ]]; then
-    echo "Image must not include the docker:// prefix: $fieldconvert_image" >&2
+if [[ "$nektar_image" == docker://* ]]; then
+    echo "Image must not include the docker:// prefix: $nektar_image" >&2
     exit 2
 fi
 
@@ -61,12 +61,12 @@ case "$container_runtime" in
             exit 127
         }
         echo "FieldConvert runtime: Docker" >&2
-        echo "FieldConvert image  : $fieldconvert_image" >&2
+        echo "Nektar++ image      : $nektar_image" >&2
         exec docker run --rm \
             --user "$(id -u):$(id -g)" \
             --mount "type=bind,src=$project_dir,dst=/data" \
             --workdir /data \
-            "$fieldconvert_image" \
+            "$nektar_image" \
             FieldConvert "$@"
         ;;
     apptainer)
@@ -75,12 +75,12 @@ case "$container_runtime" in
             exit 127
         fi
         echo "FieldConvert runtime: Apptainer ($apptainer_executable)" >&2
-        echo "FieldConvert image  : docker://$fieldconvert_image" >&2
+        echo "Nektar++ image      : docker://$nektar_image" >&2
         exec "$apptainer_executable" exec \
             --cleanenv \
             --bind "$project_dir:/data" \
             --pwd /data \
-            "docker://$fieldconvert_image" \
+            "docker://$nektar_image" \
             FieldConvert "$@"
         ;;
     *)

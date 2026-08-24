@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the official CCM-enabled NekMesh OCI image with Docker or Apptainer.
+# Run NekMesh from the pinned full Nektar++ OCI image.
 
 set -euo pipefail
 
@@ -7,7 +7,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
 source "$script_dir/container_images.sh"
 
-nekmesh_image="${NEKMESH_CONTAINER_IMAGE:-${NEKMESH_DOCKER_IMAGE:-$NEKMESH_IMAGE_DEFAULT}}"
+nektar_image="${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}"
 container_runtime="${NEKTAR_CONTAINER_RUNTIME:-auto}"
 
 if (($# == 0)); then
@@ -25,14 +25,15 @@ otherwise Apptainer is used.
 
 Override the runtime with NEKTAR_CONTAINER_RUNTIME=docker or apptainer, and
 the Apptainer command/path with APPTAINER_EXECUTABLE. Override
-the pinned image with NEKMESH_CONTAINER_IMAGE (NEKMESH_DOCKER_IMAGE remains a
-compatible alias). Image values must be registry references without docker://.
+the pinned full image with NEKTAR_CONTAINER_IMAGE. The same image is used for
+NekMesh, FieldConvert and IncNavierStokesSolver. Image values must be registry
+references without docker://.
 EOF
     exit 2
 fi
 
-if [[ "$nekmesh_image" == docker://* ]]; then
-    echo "Image must not include the docker:// prefix: $nekmesh_image" >&2
+if [[ "$nektar_image" == docker://* ]]; then
+    echo "Image must not include the docker:// prefix: $nektar_image" >&2
     exit 2
 fi
 
@@ -61,12 +62,12 @@ case "$container_runtime" in
             exit 127
         }
         echo "NekMesh runtime: Docker" >&2
-        echo "NekMesh image  : $nekmesh_image" >&2
+        echo "Nektar++ image : $nektar_image" >&2
         exec docker run --rm \
             --user "$(id -u):$(id -g)" \
             --mount "type=bind,src=$project_dir,dst=/data" \
             --workdir /data \
-            "$nekmesh_image" \
+            "$nektar_image" \
             NekMesh "$@"
         ;;
     apptainer)
@@ -75,12 +76,12 @@ case "$container_runtime" in
             exit 127
         fi
         echo "NekMesh runtime: Apptainer ($apptainer_executable)" >&2
-        echo "NekMesh image  : docker://$nekmesh_image" >&2
+        echo "Nektar++ image : docker://$nektar_image" >&2
         exec "$apptainer_executable" exec \
             --cleanenv \
             --bind "$project_dir:/data" \
             --pwd /data \
-            "docker://$nekmesh_image" \
+            "docker://$nektar_image" \
             NekMesh "$@"
         ;;
     *)
