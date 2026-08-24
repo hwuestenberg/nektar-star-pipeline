@@ -31,20 +31,29 @@ The following configuration has been exercised end to end:
 - zero negative final Jacobians in the validated run;
 - STAR steady SST donor data interpolated into a Nektar++ restart field.
 
+The current source uses shared nondimensional flow scaling in STAR and
+Nektar++: `U_inf=1`, `rho=1`, and `mu=nu=1/Re`. Regenerate the STAR donor and
+restart after changing `RANS_REYNOLDS`; an older restart is not rescaled in
+place.
+
 STAR-CCM+ is commercial software and is not distributed by this repository.
 The STAR Java API can change between versions, so other releases may require
 small macro updates.
 
-## Current reproducibility boundary
+## STAR reproducibility boundary
 
-CAD generation and every post-STAR stage are scripted. The pipeline currently
-requires a locally prepared STAR simulation template containing the imported
-geometry, named boundaries, Automated Mesh operation and periodic interface.
-The binary `.sim` file is deliberately ignored.
+The pipeline includes a STEP-to-SIM bootstrap macro. In a new STAR simulation
+it imports the CAD BRep, creates the fluid region and named boundaries, selects
+the surface/tetrahedral/prism meshers, creates the surface controls and, by
+default, constructs the translational spanwise-periodic interface. The binary
+`.sim` remains an ignored generated artifact.
 
-See [the STAR template prerequisite](docs/star-template.md) before attempting a
-fresh run. A future STEP-to-template bootstrap macro will remove this remaining
-manual checkpoint.
+The macro is API-compiled against STAR 20.04 and has completed remote runtime
+construction from the tracked STEP. The fresh-template path creates both the
+solver-level periodic interface and the mesh-only periodic part-surface
+contact required for conformal spanwise remeshing. A prepared template remains
+a documented fallback for other STAR releases. See
+[STEP-to-SIM bootstrap and fallback](docs/star-template.md).
 
 ## Repository layout
 
@@ -69,8 +78,10 @@ work/, results/              Reserved ignored run/output directories
 - Docker or Apptainer;
 - SSH and rsync only when using the optional remote-host helpers.
 
-NekMesh and FieldConvert use immutable, digest-pinned Nektar++ container
-images defined in `scripts/nektar/container_images.sh`.
+NekMesh, FieldConvert and IncNavierStokesSolver use one immutable,
+digest-pinned full Nektar++ image for the latest stable release (`v5.10.0`),
+defined in
+`scripts/nektar/container_images.sh`.
 
 ## Generate and validate the CAD
 
@@ -103,11 +114,23 @@ no site installation paths.
 
 ## Run the validated case
 
-After supplying the required local STAR template:
+After configuring the local STAR installation:
 
 ```bash
 ./execute.sh
 ```
+
+To discard all reproducible outputs before a clean run, preview and then
+execute the generated-artifact cleanup:
+
+```bash
+./scripts/workflow/clean_generated.sh
+./scripts/workflow/clean_generated.sh --execute
+./execute.sh
+```
+
+The cleanup preserves the ignored local `config/site.env` and any untracked
+non-ignored source files.
 
 The portable case settings are in
 `cases/naca0012-periodic/case.env`. Individual stages and all available
@@ -115,8 +138,10 @@ parameters are exposed through:
 
 ```bash
 ./scripts/workflow/run_remote_pipeline.sh --help
+./scripts/workflow/run_star_bootstrap.sh --help
 ./scripts/workflow/run_star_mesh.sh --help
 ./scripts/workflow/run_star_rans.sh --help
+./scripts/workflow/run_nektar_solver.sh --help
 ```
 
 The final Nektar++ inputs are:
@@ -139,8 +164,9 @@ The default is a preview. Add `--execute` only after checking the list.
 ## Documentation
 
 - [Full staged tutorial](docs/tutorial.md)
-- [STAR template prerequisite](docs/star-template.md)
+- [STAR STEP-to-SIM bootstrap and fallback](docs/star-template.md)
 - [Validated periodic case](cases/naca0012-periodic/README.md)
+- [Nektar++ restart validation case](nektar/naca0012-periodic/README.md)
 
 The long-form tutorial records the GUI checkpoints, unit conventions,
 parameter meanings, periodic workflow, RANS transfer and troubleshooting

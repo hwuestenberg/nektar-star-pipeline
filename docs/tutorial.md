@@ -1,8 +1,8 @@
 # Full NACA0012 STAR-CCM+ to NekMesh tutorial
 
 For the concise project overview and current reproducibility boundary, see the
-[repository README](../README.md). The STAR template required by the headless
-drivers is specified separately in [star-template.md](star-template.md).
+[repository README](../README.md). STEP-to-SIM generation and the manual STAR
+fallback are described in [star-template.md](star-template.md).
 
 This directory holds the reproducible tutorial pipeline:
 
@@ -13,8 +13,7 @@ CAD -> STAR-CCM+ linear tetrahedra/prisms -> CCM -> NekMesh -> Nektar++
 The complete linear import, P4 CAD projection, macro-prism split and
 high-order validation pipeline has passed its checkpoints. Generated meshes
 and logs are intentionally disposable. The source CAD and scripts are tracked;
-the prepared STAR template is currently a documented local prerequisite until
-the STEP-to-template bootstrap macro is available.
+the generated STAR template remains an ignored, version-specific artifact.
 
 ## Directory layout
 
@@ -39,14 +38,13 @@ README.md
 cad/naca0012_domain.step
 cases/naca0012-periodic/case.env
 config/site.env
-star/naca0012_mesh_template.sim
 scripts/
 ```
 
 Create `config/site.env` from `config/site.env.example`; it is deliberately
-not tracked or transferred by the site-sync helpers. The `.sim` template is
-also local and ignored. See `cases/naca0012-periodic/README.md` for the current
-case entry point.
+not tracked or transferred by the site-sync helpers. The `.sim` output is also
+local and ignored. See `cases/naca0012-periodic/README.md` for the current case
+entry point.
 
 The pipeline recreates the contents of `logs/` and `nekmesh/`, along with the
 meshed `.sim`, linear `.ccm`, provenance and STAR log files under `star/`.
@@ -211,14 +209,26 @@ will not remove STAR work generated remotely.
 
 ## Reproducible headless STAR mesh generation
 
-STAR-CCM+ 20.04 uses Java macros for in-process scripting. The prepared
-simulation remains the meshing template: it contains the named geometry,
-region/boundary assignment, Automated Mesh operation and surface-control
-membership. `scripts/star/ConfigureMesh.java` applies explicit numeric mesh
-settings before every batch mesh, and `scripts/star/ExportCcm.java` performs
-the mesh-only CCM export and saves the generated simulation.
+STAR-CCM+ 20.04 uses Java macros for in-process scripting.
+`scripts/star/BootstrapCase.java` creates the named geometry part, region,
+boundaries, Automated Mesh operation, controls and periodic interface in a new
+simulation. `scripts/star/ConfigureMesh.java` then applies explicit numeric
+mesh settings, and `scripts/star/ExportCcm.java` performs the mesh-only CCM
+export.
 
-On the remote host, save the successfully configured simulation as:
+Bootstrap the template directly from STEP:
+
+```bash
+./scripts/workflow/run_star_bootstrap.sh --force
+```
+
+This stage is also selected automatically by the full pipeline when
+`STAR_STEP` is non-empty in `config/site.env`. The API compiles against STAR
+20.04 and the tracked STEP has completed the bootstrap at runtime. Keep the
+manual template path below as a fallback for other STAR releases or for
+diagnosing site-specific import behavior.
+
+For the manual fallback, save the successfully configured simulation as:
 
 ```text
 star/naca0012_mesh_template.sim
@@ -358,14 +368,19 @@ Run the RANS stage independently after mesh generation with:
 ```bash
 ./scripts/workflow/run_star_rans.sh \
   --input-sim star/naca0012_meshed.sim \
-  --velocity 10 \
+  --reynolds 684587.012 \
   --angle-deg 0 \
   --max-steps 2000 \
   --force
 ```
 
-The default air properties are `rho=1.225 kg/m^3` and
-`mu=1.7894e-5 Pa s`, giving `Re_c ~= 6.85e5` at `U=10 m/s` and `c=1 m`.
+The donor is deliberately normalized exactly like the Nektar++ case:
+`U_inf=1`, `rho=1`, and `c=1`. The only flow-scale input is the chord Reynolds
+number, and both codes therefore use
+`mu=nu=1/Re=1.4607346947446909e-6` for the default `Re=684587.012`.
+STAR still labels these numerical values with its unit system; they represent
+the nondimensional equations and are transferred to Nektar++ without velocity
+or viscosity rescaling.
 The run produces:
 
 ```text
@@ -403,7 +418,7 @@ STAR_POD_KEY="$star_pod_key" \
     --name naca0012_rans_smoke \
     --power-on-demand \
     --run-rans \
-    --rans-velocity 10 \
+    --rans-reynolds 684587.012 \
     --rans-max-steps 2000 \
     --rans-min-steps 500 \
     --rans-residual-tol 3e-3 \
@@ -469,14 +484,13 @@ criterion. By default the pipeline rejects such a capped, unconverged field.
 Use `--rans-allow-unconverged` only when deliberately testing transfer and
 interoperability rather than creating a production initial condition.
 
-For the tutorial's one-macro-prism donor, the measured normalized residuals
-plateau at approximately `1.0e-3` (continuity), `2.2e-3` (x-momentum),
-`2.4e-4` (y-momentum), `7.8e-4` (z-momentum), `2.6e-3` (TKE), and
-`3e-4`--`6e-4` (SDR). The example therefore uses `3e-3` after at least 500
-iterations. This is an observed tutorial transfer criterion, not a universal
-RANS convergence tolerance. Requiring `1e-5` on this donor reaches the safety
-cap without additional decay; increasing the cap alone does not fix a
-residual plateau.
+The tutorial keeps a relaxed `3e-3` transfer criterion after at least 500
+iterations and permits the maximum-step result because this one-macro-prism
+donor is only an interoperability precursor. Recheck the residual and force
+histories after changing to the normalized `U=1` formulation: solver scaling
+can change the reported normalized-residual history even at identical
+Reynolds number. This is not a universal RANS convergence tolerance, and
+increasing the cap alone does not fix a residual plateau.
 
 Residual convergence is necessary but not sufficient. For production work,
 also create lift/drag report monitors and require a suitably small asymptotic
@@ -540,10 +554,22 @@ nekmesh/NAME_rans_initial.fld
 nekmesh/NAME_rans_initial.vtu
 ```
 
-The automatic session is sufficient for interpolation and visualization. A
-solver run should add its intended `CONDITIONS`, boundary conditions, solver
-information and pressure-nullspace configuration while retaining the same
-geometry and expansion definitions.
+The automatic session is sufficient for interpolation and visualization. The
+solver validation session is tracked separately at
+`nektar/naca0012-periodic/session.xml`; it adds the intended expansions,
+conditions, periodic pair, force/modal-energy filters and checkpoint output.
+Run it with:
+
+```bash
+./scripts/workflow/run_nektar_solver.sh --force --steps 100 --np 32
+```
+
+The 100-step restart validation has completed on 32 MPI ranks. A 48-rank
+decomposition failed in its first pressure solve, so decomposition sensitivity
+must still be checked before selecting a production MPI layout. That run used
+the preceding donor scaling; regenerate the donor and repeat it after the
+`U=1`, `rho=1`, `nu=1/Re` change. See `nektar/naca0012-periodic/README.md` for
+the current checkpoint.
 
 ## Spanwise periodicity in STAR and NekMesh
 
@@ -712,10 +738,11 @@ from the local tutorial root:
 ./scripts/site/sync_from_remote.sh --execute
 ```
 
-## Container runtime and pinned Nektar++ images
+## Container runtime and pinned Nektar++ image
 
-The Nektar++ wrappers use the same digest-pinned OCI images on local and remote
-machines. Runtime selection prefers Docker when available and otherwise uses
+All Nektar++ wrappers use one digest-pinned full OCI image on local and remote
+machines. It supplies NekMesh, FieldConvert and IncNavierStokesSolver. Runtime
+selection prefers Docker when available and otherwise uses
 the `APPTAINER_EXECUTABLE` command/path from `config/site.env`.
 
 Apptainer pulls the images through their `docker://` registry transport; this
@@ -727,9 +754,10 @@ automatic, or can be made explicit with:
 NEKTAR_CONTAINER_RUNTIME=apptainer ./scripts/nektar/nekmesh_docker.sh -l
 ```
 
-The immutable defaults are defined once in `scripts/nektar/container_images.sh`.
-Override them only deliberately using `NEKMESH_CONTAINER_IMAGE` or
-`FIELDCONVERT_CONTAINER_IMAGE`.
+The immutable default is defined once in `scripts/nektar/container_images.sh`.
+Override it only deliberately using `NEKTAR_CONTAINER_IMAGE`.
+The former component-specific NekMesh, FieldConvert and solver image variables
+have been removed; delete them from older local `config/site.env` files.
 
 ## Remote end-to-end pipeline
 
@@ -1090,21 +1118,21 @@ STAR_POD_KEY="$star_pod_key" ./scripts/workflow/run_resolution_study.sh \
 # Run --level 2 only after inspecting the first two.
 ```
 
-## CCM-enabled NekMesh container
+## CCM-enabled NekMesh in the full Nektar++ container
 
 The locally built NekMesh executables were configured with
-`NEKTAR_USE_CCM=OFF`. The official purpose-built image is instead used for a
+`NEKTAR_USE_CCM=OFF`. The pinned full Nektar++ image is instead used for a
 reproducible conversion:
 
 ```bash
 ./scripts/nektar/nekmesh_docker.sh -l
 ```
 
-The wrapper is pinned to the tested image digest
-`sha256:2187fd1ecb94d2fee4eaa478b232779b8d5bd354eff811beafbc71c3b6adf68b`.
-Its module list contains the `ccm` input and the `projectcad`, `bl`, `jac` and
-`varopti` processing modules. It mounts this tutorial directory at `/data` and
-runs as the invoking user's UID/GID, so generated files remain locally owned.
+The same `nektarpp/nektar` digest used for FieldConvert and the solver exposes
+NekMesh with the `ccm` input and the `projectcad`, `bl`, `jac`, `peralign` and
+`varopti` processing modules. The wrapper mounts this tutorial directory at
+`/data` and runs as the invoking user's UID/GID, so generated files remain
+locally owned.
 
 The Stage 7 linear conversion is:
 
@@ -1154,8 +1182,9 @@ the wing is `C[4]`, not `C[2]`.
 
 ## FieldConvert container
 
-There is no separate official FieldConvert runtime image. FieldConvert is part
-of the full `nektarpp/nektar` image. The matching wrapper is:
+FieldConvert and NekMesh are both part of the full `nektarpp/nektar` image, so
+the pipeline does not pull a separate utility image. The FieldConvert wrapper
+is:
 
 ```bash
 ./scripts/nektar/fieldconvert_docker.sh -h
@@ -1165,15 +1194,15 @@ of the full `nektarpp/nektar` image. The matching wrapper is:
 ```
 
 The wrapper uses the same bind mount and invoking UID/GID as the NekMesh
-wrapper. It is pinned to the tested amd64 image digest
-`sha256:ea6caaa177e163f554769580f4bc200e9785b2b588520afad985654f556397a2`,
-published under commit tag `nektarpp/nektar:7b6a6eb0` on 18 August 2026. This
-was newer than the registry's temporarily lagging `latest` tag when checked.
-To deliberately test whatever `latest` resolves to later without editing the
-script, use:
+wrapper. The default is the official Nektar++ `v5.10.0` release image, pinned
+to its tested amd64 digest
+`sha256:2ae26f90b902742b7b2a7e6c9a18542b171e654a26f54b9944ab636d24da3748`.
+The release was published on 4 July 2026; its Docker tag and release commit tag
+`078dc2fa` resolve to this same digest. To deliberately test the rolling
+development image without editing the script, use:
 
 ```bash
-FIELDCONVERT_DOCKER_IMAGE=nektarpp/nektar:latest \
+NEKTAR_CONTAINER_IMAGE=nektarpp/nektar:latest \
   ./scripts/nektar/fieldconvert_docker.sh -h
 ```
 
