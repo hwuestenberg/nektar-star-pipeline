@@ -15,6 +15,7 @@ star_processes=1
 rans_processes=""
 star_executable=""
 star_template="star/naca0012_mesh_template.sim"
+star_step=""
 star_mesh_operation="NACA0012_AutomatedMesh"
 star_wing_control="WingSurfaceControl"
 star_volume_control="WingVolumeControl"
@@ -32,14 +33,15 @@ periodic_span=false
 periodic_surf1=6
 periodic_surf2=8
 periodic_dir="z"
+periodic_translation_x="0.0"
+periodic_translation_y="0.0"
+periodic_translation_z="0.2"
 periodic_tolfac="4"
 periodic_abstol="0"
 star_periodic_interface="SpanwisePeriodic"
 run_rans=false
-rans_velocity="10.0"
+rans_reynolds="684587.012"
 rans_angle_deg="0.0"
-rans_density="1.225"
-rans_viscosity="1.7894e-5"
 rans_pressure="0.0"
 rans_turb_intensity="0.01"
 rans_turb_visc_ratio="10.0"
@@ -95,6 +97,8 @@ Options:
   --star-executable FILE       STAR-CCM+ launcher path
                                (default: site-specific wrapper default)
   --star-template FILE         Prepared STAR .sim template
+  --star-step FILE             Bootstrap a fresh template from this STEP before
+                               meshing; supersedes --star-template as input
   --star-mesh-operation NAME   Automated Mesh operation name
   --star-wing-control NAME     Wing Surface Custom Mesh Control name
   --star-volume-control NAME   Volumetric control name (created if absent)
@@ -119,6 +123,11 @@ Optional spanwise periodic alignment:
                      Second span composite (default: 8, SpanMax)
   --periodic-dir AXIS
                      Translation direction x, y or z (default: z)
+  --periodic-translation-x M
+  --periodic-translation-y M
+  --periodic-translation-z M
+                     STAR translation from SpanMin to SpanMax in metres
+                     (default: 0, 0, 0.2)
   --periodic-tolfac F Relative-tolerance factor, F >= 1 (default: 4)
   --periodic-abstol T Absolute matching tolerance, T >= 0 (default: 0)
   --star-periodic-interface NAME
@@ -128,12 +137,11 @@ Optional spanwise periodic alignment:
 Optional STAR RANS precursor:
   --run-rans         Solve steady constant-density SST after STAR meshing and
                      export x,y,z,u,v,w,p for Nektar++ interpolation
-  --rans-velocity U  Freestream magnitude in m/s (default: 10)
+  --rans-reynolds RE  Chord Reynolds number (default: 684587.012). STAR uses
+                     the Nektar++ nondimensional convention U=1, rho=1,
+                     chord=1 and mu=nu=1/RE.
   --rans-angle-deg A Angle in the x-y plane (default: 0)
-  --rans-density RHO Density in kg/m^3 (default: 1.225)
-  --rans-viscosity MU
-                     Dynamic viscosity in Pa s (default: 1.7894e-5)
-  --rans-pressure P  Outlet gauge pressure in Pa (default: 0)
+  --rans-pressure P  Nondimensional outlet reference pressure (default: 0)
   --rans-turb-intensity I
                      Inlet turbulence intensity as a fraction (default: .01)
   --rans-turb-visc-ratio R
@@ -179,8 +187,9 @@ STAR mesh parameters:
   -h, --help         Show this help
 
 The container wrappers select Docker or Apptainer from the configured site.
-Set NEKTAR_CONTAINER_RUNTIME to force one runtime. The default OCI images are
-immutable digest-pinned references in scripts/nektar/container_images.sh.
+Set NEKTAR_CONTAINER_RUNTIME to force one runtime. The default full Nektar++
+OCI image is an immutable digest-pinned reference in
+scripts/nektar/container_images.sh.
 EOF
 }
 
@@ -220,6 +229,14 @@ while (($#)); do
                 exit 2
             }
             star_template="$2"
+            shift 2
+            ;;
+        --star-step)
+            [[ $# -ge 2 ]] || {
+                echo "--star-step requires a value" >&2
+                exit 2
+            }
+            star_step="$2"
             shift 2
             ;;
         --star-mesh-operation)
@@ -358,6 +375,30 @@ while (($#)); do
             periodic_dir="$2"
             shift 2
             ;;
+        --periodic-translation-x)
+            [[ $# -ge 2 ]] || {
+                echo "--periodic-translation-x requires a value" >&2
+                exit 2
+            }
+            periodic_translation_x="$2"
+            shift 2
+            ;;
+        --periodic-translation-y)
+            [[ $# -ge 2 ]] || {
+                echo "--periodic-translation-y requires a value" >&2
+                exit 2
+            }
+            periodic_translation_y="$2"
+            shift 2
+            ;;
+        --periodic-translation-z)
+            [[ $# -ge 2 ]] || {
+                echo "--periodic-translation-z requires a value" >&2
+                exit 2
+            }
+            periodic_translation_z="$2"
+            shift 2
+            ;;
         --periodic-tolfac)
             [[ $# -ge 2 ]] || {
                 echo "--periodic-tolfac requires a value" >&2
@@ -386,12 +427,12 @@ while (($#)); do
             run_rans=true
             shift
             ;;
-        --rans-velocity)
+        --rans-reynolds)
             [[ $# -ge 2 ]] || {
-                echo "--rans-velocity requires a value" >&2
+                echo "--rans-reynolds requires a value" >&2
                 exit 2
             }
-            rans_velocity="$2"
+            rans_reynolds="$2"
             shift 2
             ;;
         --rans-angle-deg)
@@ -400,22 +441,6 @@ while (($#)); do
                 exit 2
             }
             rans_angle_deg="$2"
-            shift 2
-            ;;
-        --rans-density)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-density requires a value" >&2
-                exit 2
-            }
-            rans_density="$2"
-            shift 2
-            ;;
-        --rans-viscosity)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-viscosity requires a value" >&2
-                exit 2
-            }
-            rans_viscosity="$2"
             shift 2
             ;;
         --rans-pressure)
@@ -693,6 +718,15 @@ if [[ ! "$periodic_dir" =~ ^(x|y|z)$ ]]; then
     echo "--periodic-dir must be x, y or z: $periodic_dir" >&2
     exit 2
 fi
+for translation in \
+    "$periodic_translation_x" \
+    "$periodic_translation_y" \
+    "$periodic_translation_z"; do
+    awk -v value="$translation" 'BEGIN { exit !(value ~ /^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$/) }' || {
+        echo "Periodic translation components must be numeric: $translation" >&2
+        exit 2
+    }
+done
 if [[ ! "$bl_layers" =~ ^[1-9][0-9]*$ ]]; then
     echo "--bl-layers must be a positive integer: $bl_layers" >&2
     exit 2
@@ -756,9 +790,7 @@ validate_positive_number --star-wing-curvature "$star_wing_curvature_points"
 validate_positive_number --star-prism-height "$star_prism_height"
 validate_positive_number --star-prism-stretching "$star_prism_stretching"
 validate_positive_number --star-volume-size-pct "$star_volume_size_pct"
-validate_positive_number --rans-velocity "$rans_velocity"
-validate_positive_number --rans-density "$rans_density"
-validate_positive_number --rans-viscosity "$rans_viscosity"
+validate_positive_number --rans-reynolds "$rans_reynolds"
 validate_positive_number --rans-turb-intensity "$rans_turb_intensity"
 validate_positive_number --rans-turb-visc-ratio "$rans_turb_visc_ratio"
 validate_positive_number --rans-residual-tol "$rans_residual_tolerance"
@@ -931,12 +963,18 @@ if [[ "$periodic_span" == true ]]; then
     printf '  periodic tolerances         : tolfac=%s, abstol=%s\n' \
         "$periodic_tolfac" "$periodic_abstol"
     printf '  STAR periodic interface     : %s\n' "$star_periodic_interface"
+    printf '  STAR periodic translation   : (%s,%s,%s) m\n' \
+        "$periodic_translation_x" "$periodic_translation_y" \
+        "$periodic_translation_z"
 fi
 if [[ "$run_rans" == true ]]; then
-    rans_reynolds="$(awk -v rho="$rans_density" -v u="$rans_velocity" -v mu="$rans_viscosity" \
-        'BEGIN { printf "%.9g", rho*u/mu }')"
-    printf '  STAR RANS precursor         : SST, U=%s m/s, alpha=%s deg, Re_c=%s\n' \
-        "$rans_velocity" "$rans_angle_deg" "$rans_reynolds"
+    rans_kinematic_viscosity="$(awk -v re="$rans_reynolds" \
+        'BEGIN { printf "%.17g", 1.0/re }')"
+    printf '  STAR RANS precursor         : SST, nondimensional U=1, rho=1, Re_c=%s\n' \
+        "$rans_reynolds"
+    printf '  STAR/Nektar viscosity       : mu=nu=1/Re=%s\n' \
+        "$rans_kinematic_viscosity"
+    printf '  STAR RANS incidence         : alpha=%s deg\n' "$rans_angle_deg"
     printf '  STAR RANS stopping          : max=%s OR (min=%s AND all residuals<%s)\n' \
         "$rans_max_steps" "$rans_min_steps" "$rans_residual_tolerance"
     printf '  STAR RANS acceptance        : residual convergence required=%s\n' \
@@ -982,6 +1020,14 @@ generated_outputs=(
     "logs/${final_stem}_fieldconvert.log"
     "logs/${case_name}_pipeline.provenance.txt"
 )
+if [[ -n "$star_step" && "$skip_star" != true ]]; then
+    generated_outputs+=(
+        "$star_template"
+        "star/${case_name}_bootstrap.log"
+        "star/${case_name}_bootstrap.provenance.txt"
+        "logs/${case_name}_bootstrap_driver.log"
+    )
+fi
 if [[ "$periodic_span" == true ]]; then
     generated_outputs+=(
         "nekmesh/${periodic_check_stem}.xml"
@@ -1093,6 +1139,34 @@ run_star_stage() {
     fi
 }
 
+run_star_bootstrap_stage() {
+    local bootstrap_args=(
+        --step "$star_step"
+        --output-sim "$star_template"
+        --log "star/${case_name}_bootstrap.log"
+        --provenance "star/${case_name}_bootstrap.provenance.txt"
+        --np "$star_processes"
+        --periodic-translation-x "$periodic_translation_x"
+        --periodic-translation-y "$periodic_translation_y"
+        --periodic-translation-z "$periodic_translation_z"
+        "${star_force_arg[@]}"
+    )
+    if [[ "$periodic_span" == true ]]; then
+        bootstrap_args+=(--periodic-span)
+    else
+        bootstrap_args+=(--no-periodic-span)
+    fi
+    if [[ -n "$star_executable" ]]; then
+        bootstrap_args+=(--star-executable "$star_executable")
+    fi
+    if [[ "$power_on_demand" == true ]]; then
+        STAR_POD_KEY="$pod_key" "$script_dir/run_star_bootstrap.sh" \
+            "${bootstrap_args[@]}" --power-on-demand
+    else
+        "$script_dir/run_star_bootstrap.sh" "${bootstrap_args[@]}"
+    fi
+}
+
 run_rans_stage() {
     local rans_span_mode="symmetry"
     if [[ "$periodic_span" == true ]]; then
@@ -1106,10 +1180,8 @@ run_rans_stage() {
         --log "star/${case_name}_rans.log"
         --provenance "star/${case_name}_rans.provenance.txt"
         --np "$rans_processes"
-        --velocity "$rans_velocity"
+        --reynolds "$rans_reynolds"
         --angle-deg "$rans_angle_deg"
-        --density "$rans_density"
-        --viscosity "$rans_viscosity"
         --pressure "$rans_pressure"
         --turb-intensity "$rans_turb_intensity"
         --turb-visc-ratio "$rans_turb_visc_ratio"
@@ -1175,6 +1247,10 @@ validate_peralign() {
 started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 if [[ "$skip_star" != true ]]; then
+    if [[ -n "$star_step" ]]; then
+        run_stage "STAR STEP-to-SIM bootstrap" \
+            "logs/${case_name}_bootstrap_driver.log" run_star_bootstrap_stage
+    fi
     run_stage "STAR mesh and CCM export" \
         "logs/${case_name}_star_driver.log" run_star_stage
 else
@@ -1315,6 +1391,7 @@ provenance="logs/${case_name}_pipeline.provenance.txt"
     printf 'star_processes=%s\n' "$star_processes"
     printf 'rans_processes=%s\n' "$rans_processes"
     printf 'star_template=%s\n' "$star_template"
+    printf 'star_step=%s\n' "$star_step"
     printf 'star_mesh_operation=%s\n' "$star_mesh_operation"
     printf 'star_wing_control=%s\n' "$star_wing_control"
     printf 'star_volume_control=%s\n' "$star_volume_control"
@@ -1332,15 +1409,20 @@ provenance="logs/${case_name}_pipeline.provenance.txt"
     printf 'periodic_surf1=%s\n' "$periodic_surf1"
     printf 'periodic_surf2=%s\n' "$periodic_surf2"
     printf 'periodic_direction=%s\n' "$periodic_dir"
+    printf 'periodic_translation_x_m=%s\n' "$periodic_translation_x"
+    printf 'periodic_translation_y_m=%s\n' "$periodic_translation_y"
+    printf 'periodic_translation_z_m=%s\n' "$periodic_translation_z"
     printf 'periodic_tolfac=%s\n' "$periodic_tolfac"
     printf 'periodic_abstol=%s\n' "$periodic_abstol"
     printf 'star_periodic_interface=%s\n' "$star_periodic_interface"
     printf 'rans_enabled=%s\n' "$run_rans"
-    printf 'rans_velocity_mps=%s\n' "$rans_velocity"
+    printf 'rans_nondimensional_velocity=%s\n' "1.0"
     printf 'rans_angle_deg=%s\n' "$rans_angle_deg"
-    printf 'rans_density_kgm3=%s\n' "$rans_density"
-    printf 'rans_viscosity_pas=%s\n' "$rans_viscosity"
-    printf 'rans_pressure_pa=%s\n' "$rans_pressure"
+    printf 'rans_nondimensional_density=%s\n' "1.0"
+    printf 'rans_reynolds=%s\n' "$rans_reynolds"
+    printf 'rans_nondimensional_kinematic_viscosity=%s\n' \
+        "$(awk -v re="$rans_reynolds" 'BEGIN { printf "%.17g", 1.0/re }')"
+    printf 'rans_reference_pressure=%s\n' "$rans_pressure"
     printf 'rans_turbulence_intensity=%s\n' "$rans_turb_intensity"
     printf 'rans_turbulent_viscosity_ratio=%s\n' "$rans_turb_visc_ratio"
     printf 'rans_maximum_steps=%s\n' "$rans_max_steps"
@@ -1377,8 +1459,8 @@ provenance="logs/${case_name}_pipeline.provenance.txt"
     printf 'derived_volume_size_m=%s\n' "$volume_size_m"
     printf 'derived_first_split_height_m=%s\n' "$first_split_height_m"
     printf 'container_runtime_request=%s\n' "${NEKTAR_CONTAINER_RUNTIME:-auto}"
-    printf 'nekmesh_image=%s\n' "${NEKMESH_CONTAINER_IMAGE:-${NEKMESH_DOCKER_IMAGE:-$NEKMESH_IMAGE_DEFAULT}}"
-    printf 'fieldconvert_image=%s\n' "${FIELDCONVERT_CONTAINER_IMAGE:-${FIELDCONVERT_DOCKER_IMAGE:-$FIELDCONVERT_IMAGE_DEFAULT}}"
+    printf 'nektar_release=%s\n' "$NEKTAR_RELEASE_DEFAULT"
+    printf 'nektar_image=%s\n' "${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}"
     for output in \
         "$cad_file" \
         "$ccm_file" \

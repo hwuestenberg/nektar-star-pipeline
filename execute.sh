@@ -28,7 +28,7 @@ fi
 
 for environment_variable in \
     NEKTAR_CONTAINER_RUNTIME APPTAINER_EXECUTABLE \
-    NEKMESH_CONTAINER_IMAGE FIELDCONVERT_CONTAINER_IMAGE; do
+    NEKTAR_CONTAINER_IMAGE; do
     if [[ -n "${!environment_variable:-}" ]]; then
         export "$environment_variable"
     fi
@@ -36,9 +36,12 @@ done
 
 required_variables=(
     CASE_NAME STAR_TEMPLATE STAR_NP RANS_NP STAR_LICENSE_MODE
-    PERIODIC_SURF1 PERIODIC_SURF2 PERIODIC_DIR STAR_PERIODIC_INTERFACE
-    RANS_MAX_STEPS RANS_MIN_STEPS RANS_RESIDUAL_TOL RANS_NUM_MODES
-    CAD_ORDER BL_LAYERS BL_RATIO
+    PERIODIC_SURF1 PERIODIC_SURF2 PERIODIC_DIR
+    PERIODIC_TRANSLATION_X PERIODIC_TRANSLATION_Y PERIODIC_TRANSLATION_Z
+    STAR_PERIODIC_INTERFACE
+    RANS_REYNOLDS RANS_MAX_STEPS RANS_MIN_STEPS RANS_RESIDUAL_TOL
+    RANS_ALLOW_UNCONVERGED RANS_NUM_MODES
+    CAD_ORDER BL_SURFACE BL_LAYERS BL_RATIO
 )
 for variable_name in "${required_variables[@]}"; do
     if [[ -z "${!variable_name:-}" ]]; then
@@ -58,17 +61,38 @@ pipeline_args=(
     --periodic-surf1 "$PERIODIC_SURF1"
     --periodic-surf2 "$PERIODIC_SURF2"
     --periodic-dir "$PERIODIC_DIR"
+    --periodic-translation-x "$PERIODIC_TRANSLATION_X"
+    --periodic-translation-y "$PERIODIC_TRANSLATION_Y"
+    --periodic-translation-z "$PERIODIC_TRANSLATION_Z"
     --star-periodic-interface "$STAR_PERIODIC_INTERFACE"
     --run-rans
+    --rans-reynolds "$RANS_REYNOLDS"
     --rans-max-steps "$RANS_MAX_STEPS"
     --rans-min-steps "$RANS_MIN_STEPS"
     --rans-residual-tol "$RANS_RESIDUAL_TOL"
     --rans-session auto
     --rans-num-modes "$RANS_NUM_MODES"
     --cad-order "$CAD_ORDER"
+    --bl-surface "$BL_SURFACE"
     --bl-layers "$BL_LAYERS"
     --bl-ratio "$BL_RATIO"
 )
+
+case "$RANS_ALLOW_UNCONVERGED" in
+    true)
+        pipeline_args+=(--rans-allow-unconverged)
+        ;;
+    false)
+        ;;
+    *)
+        echo "RANS_ALLOW_UNCONVERGED must be true or false." >&2
+        exit 2
+        ;;
+esac
+
+if [[ -n "${STAR_STEP:-}" ]]; then
+    pipeline_args+=(--star-step "$STAR_STEP")
+fi
 
 if [[ -n "${STAR_EXECUTABLE:-}" ]]; then
     pipeline_args+=(--star-executable "$STAR_EXECUTABLE")
