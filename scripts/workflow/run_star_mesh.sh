@@ -682,7 +682,10 @@ if ! rmdir -- "$stage_dir" 2>/dev/null; then
     echo "STAR left auxiliary files in the staging directory: $stage_dir"
 fi
 
-star_version="$("$star_executable" -version 2>&1 || true)"
+# Avoid starting another STAR process solely for provenance. Every normal
+# batch log already contains the exact product/build line.
+star_version="$(awk '/^Simcenter STAR-CCM\+/ {print; exit}' "$log_file")"
+star_version="${star_version:-unknown}"
 {
     printf 'generated_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'host=%s\n' "$(hostname)"

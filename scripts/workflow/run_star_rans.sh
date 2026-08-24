@@ -43,6 +43,8 @@ min_steps=200
 residual_tolerance="1.0e-5"
 pressure_mode="keep"
 allow_unconverged=false
+velocity_only=false
+single_session=false
 extra_star_args=()
 
 usage() {
@@ -77,6 +79,11 @@ Physics:
   --pressure-mode MODE   keep, subtract-first, or zero-mean (default: keep)
   --allow-unconverged    Permit export when the maximum-step cap is reached
                          before all residual criteria are satisfied
+  --velocity-only        Export x,y,z,u,v,w without pressure. Use this when
+                         the Nektar++ session initializes pressure separately.
+  --single-session       Configure, solve and export in one STAR process.
+                         This avoids a save/reload and is intended for a
+                         validated production setup.
 
 STAR object names:
   --region NAME          Region (default: Fluid)
@@ -226,6 +233,14 @@ while (($#)); do
             ;;
         --allow-unconverged)
             allow_unconverged=true
+            shift
+            ;;
+        --velocity-only)
+            velocity_only=true
+            shift
+            ;;
+        --single-session)
+            single_session=true
             shift
             ;;
         --power-on-demand)
@@ -401,6 +416,10 @@ configure_command=("$star_executable" -np "$processes" "${extra_star_args[@]}"
     -batch "$configure_macro" "$staged_sim")
 solve_command=("$star_executable" -np "$processes" "${extra_star_args[@]}"
     -batch "run,$export_macro" "$staged_sim")
+if [[ "$single_session" == true ]]; then
+    configure_command=("$star_executable" -np "$processes" "${extra_star_args[@]}"
+        -batch "$configure_macro,run,$export_macro" "$staged_sim")
+fi
 velocity_mps="1.0"
 density_kgm3="1.0"
 viscosity_pas="$(awk -v re="$reynolds" 'BEGIN { printf "%.17g", 1.0/re }')"
@@ -422,12 +441,18 @@ echo "Span mode      : $span_mode"
 if [[ "$span_mode" == periodic ]]; then
     echo "Periodic input : requires STAR interface $periodic_interface"
 fi
-printf 'Configure cmd   :'
-printf ' %q' "${configure_command[@]}"
-printf '\n'
-printf 'Solve/export cmd:'
-printf ' %q' "${solve_command[@]}"
-printf '\n'
+if [[ "$single_session" == true ]]; then
+    printf 'Combined cmd    :'
+    printf ' %q' "${configure_command[@]}"
+    printf '\n'
+else
+    printf 'Configure cmd   :'
+    printf ' %q' "${configure_command[@]}"
+    printf '\n'
+    printf 'Solve/export cmd:'
+    printf ' %q' "${solve_command[@]}"
+    printf '\n'
+fi
 
 if [[ "$dry_run" == true ]]; then
     echo "Dry run only; STAR was not executed."
@@ -457,6 +482,7 @@ export STAR_RANS_MIN_STEPS="$min_steps"
 export STAR_RANS_RESIDUAL_TOL="$residual_tolerance"
 export STAR_RANS_SIM_OUTPUT="$staged_sim"
 export STAR_RANS_TABLE_OUTPUT="$staged_raw"
+export STAR_RANS_EXPORT_PRESSURE="$([[ "$velocity_only" == true ]] && printf false || printf true)"
 if [[ "$power_on_demand" == true ]]; then export LM_PROJECT="$pod_key"; fi
 
 set +e
@@ -489,11 +515,15 @@ if ((configure_status != 0)); then
     echo "Warning: STAR configure launcher returned $configure_status, but configuration was independently validated." >&2
 fi
 
-printf '\n===== STAR RANS SOLVE/EXPORT PHASE =====\n' >>"$log_file"
-set +e
-"${solve_command[@]}" >>"$log_file" 2>&1
-solve_status=$?
-set -e
+if [[ "$single_session" == true ]]; then
+    solve_status=$configure_status
+else
+    printf '\n===== STAR RANS SOLVE/EXPORT PHASE =====\n' >>"$log_file"
+    set +e
+    "${solve_command[@]}" >>"$log_file" 2>&1
+    solve_status=$?
+    set -e
+fi
 unset LM_PROJECT 2>/dev/null || true
 pod_key=""
 
@@ -558,8 +588,12 @@ if [[ "$residuals_converged" != true ]]; then
     fi
 fi
 
+normalizer_args=("$staged_raw" "$staged_csv" --pressure-mode "$pressure_mode")
+if [[ "$velocity_only" == true ]]; then
+    normalizer_args+=(--velocity-only)
+fi
 if ! python3 "$nektar_script_dir/normalize_star_rans_csv.py" \
-    "$staged_raw" "$staged_csv" --pressure-mode "$pressure_mode"; then
+    "${normalizer_args[@]}"; then
     echo "STAR table normalization failed; staging retained: $stage_dir" >&2
     exit 1
 fi
@@ -574,7 +608,9 @@ mv -f -- "$staged_csv" "$output_csv"
 rm -f -- "${staged_sim}~"
 rmdir -- "$stage_dir" 2>/dev/null || true
 
-star_version="$("$star_executable" -version 2>&1 || true)"
+# The batch banner is authoritative and avoids an extra STAR launcher startup.
+star_version="$(awk '/^Simcenter STAR-CCM\+/ {print; exit}' "$log_file")"
+star_version="${star_version:-unknown}"
 final_iteration="$(awk -F: '/STAR batch final iteration/ {gsub(/[[:space:]]/, "", $2); value=$2} END {print value}' "$log_file")"
 {
     printf 'generated_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -596,6 +632,8 @@ final_iteration="$(awk -F: '/STAR batch final iteration/ {gsub(/[[:space:]]/, ""
     printf 'final_iteration=%s\n' "${final_iteration:-unknown}"
     printf 'residuals_converged=%s\n' "$residuals_converged"
     printf 'allow_unconverged=%s\n' "$allow_unconverged"
+    printf 'velocity_only=%s\n' "$velocity_only"
+    printf 'single_session=%s\n' "$single_session"
     printf 'region=%s\ncontinuum=%s\n' "$region" "$continuum"
     printf 'span_mode=%s\n' "$span_mode"
     printf 'periodic_interface=%s\n' "$periodic_interface"
