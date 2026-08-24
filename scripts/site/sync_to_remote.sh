@@ -87,6 +87,8 @@ rsync_args=(
     --human-readable
     --itemize-changes
     --exclude=.git/
+    --exclude=.pytest_cache/
+    --exclude=.ruff_cache/
     --exclude=.env
     --exclude=star_pod_key
     --exclude='config/site.env'
