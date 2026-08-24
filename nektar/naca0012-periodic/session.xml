@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<NEKTAR>
+    <EXPANSIONS>
+        <E COMPOSITE="C[0]" BASISTYPE="Modified_A,Modified_A,Modified_B" NUMMODES="5,5,5" POINTSTYPE="GaussLobattoLegendre,GaussLobattoLegendre,GaussRadauMAlpha1Beta0" NUMPOINTS="7,7,6" FIELDS="u,v,w" />
+        <E COMPOSITE="C[0]" BASISTYPE="Modified_A,Modified_A,Modified_B" NUMMODES="4,4,4" POINTSTYPE="GaussLobattoLegendre,GaussLobattoLegendre,GaussRadauMAlpha1Beta0" NUMPOINTS="7,7,6" FIELDS="p" />
+        <E COMPOSITE="C[2]" BASISTYPE="Modified_A,Modified_B,Modified_C" NUMMODES="5,5,5" POINTSTYPE="GaussLobattoLegendre,GaussRadauMAlpha1Beta0,GaussRadauMAlpha2Beta0" NUMPOINTS="7,6,6" FIELDS="u,v,w" />
+        <E COMPOSITE="C[2]" BASISTYPE="Modified_A,Modified_B,Modified_C" NUMMODES="4,4,4" POINTSTYPE="GaussLobattoLegendre,GaussRadauMAlpha1Beta0,GaussRadauMAlpha2Beta0" NUMPOINTS="7,6,6" FIELDS="p" />
+    </EXPANSIONS>
+    <CONDITIONS>
+        <SOLVERINFO>
+            <I PROPERTY="SolverType" VALUE="VelocityCorrectionScheme" />
+            <I PROPERTY="EQTYPE" VALUE="UnsteadyNavierStokes" />
+            <I PROPERTY="EvolutionOperator" VALUE="Nonlinear" />
+            <I PROPERTY="Projection" VALUE="Continuous" />
+            <I PROPERTY="SuccessiveRHS" VALUE="-10" />
+            <I PROPERTY="Driver" VALUE="Standard" />
+            <I PROPERTY="SpectralHpDealiasing" VALUE="True" />
+            <I PROPERTY="CheckAbortFile" VALUE="ABORT" />
+            <I PROPERTY="CheckAbortStep" VALUE="10" />
+            <I PROPERTY="SpectralVanishingViscosity" VALUE="DGKernel" />
+        </SOLVERINFO>
+        <TIMEINTEGRATIONSCHEME>
+            <METHOD>IMEX</METHOD>
+            <ORDER>2</ORDER>
+        </TIMEINTEGRATIONSCHEME>
+        <PARAMETERS>
+            <P> IO_InfoSteps  = 1 </P>
+            <P> TimeStep      = 1e-5 </P>
+            <P> StepsPerCTU   = 25000 </P>
+            <P> NumSteps      = 100 </P>
+            <P> IO_CFLSteps   = 1 </P>
+            <P> Reynolds      = 684587.012 </P>
+            <P> Uinf          = 1.0 </P>
+            <P> Kinvis        = 1.0/Reynolds </P>
+            <P> SVVDiffCoeff  = 0.4 </P>
+        </PARAMETERS>
+        <VARIABLES>
+            <V ID="0">u</V>
+            <V ID="1">v</V>
+            <V ID="2">w</V>
+            <V ID="3">p</V>
+        </VARIABLES>
+        <GLOBALSYSSOLNINFO>
+            <V VAR="u,v,w">
+                <I PROPERTY="GlobalSysSoln" VALUE="IterativeStaticCond" />
+                <I PROPERTY="Preconditioner" VALUE="LowEnergyBlock" />
+                <I PROPERTY="IterativeSolverTolerance" VALUE="1e-2" />
+                <I PROPERTY="AbsoluteTolerance" VALUE="True" />
+            </V>
+            <V VAR="p">
+                <I PROPERTY="GlobalSysSoln" VALUE="IterativeStaticCond" />
+                <I PROPERTY="Preconditioner" VALUE="Diagonal" />
+                <I PROPERTY="IterativeSolverTolerance" VALUE="1e-4" />
+                <I PROPERTY="AbsoluteTolerance" VALUE="True" />
+            </V>
+        </GLOBALSYSSOLNINFO>
+        <BOUNDARYREGIONS>
+            <B ID="0">C[4]</B>  <!-- Wing -->
+            <B ID="1">C[5]</B>  <!-- Downstream -->
+            <B ID="2">C[6]</B>  <!-- SpanMin -->
+            <B ID="3">C[7]</B>  <!-- FarfieldTop -->
+            <B ID="4">C[8]</B>  <!-- SpanMax -->
+            <B ID="5">C[9]</B>  <!-- FarfieldBottom -->
+            <B ID="6">C[10]</B> <!-- Upstream -->
+        </BOUNDARYREGIONS>
+        <BOUNDARYCONDITIONS>
+            <REGION REF="0">
+                <D VAR="u" VALUE="0" />
+                <D VAR="v" VALUE="0" />
+                <D VAR="w" VALUE="0" />
+                <N VAR="p" USERDEFINEDTYPE="H" VALUE="0" />
+            </REGION>
+            <REGION REF="1">
+                <N VAR="u" VALUE="0" />
+                <N VAR="v" VALUE="0" />
+                <N VAR="w" VALUE="0" />
+                <D VAR="p" VALUE="0" />
+            </REGION>
+            <REGION REF="2">
+                <P VAR="u" VALUE="[4]" />
+                <P VAR="v" VALUE="[4]" />
+                <P VAR="w" VALUE="[4]" />
+                <P VAR="p" VALUE="[4]" />
+            </REGION>
+            <REGION REF="3">
+                <N VAR="u" VALUE="0" />
+                <D VAR="v" VALUE="0" />
+                <N VAR="w" VALUE="0" />
+                <N VAR="p" USERDEFINEDTYPE="H" VALUE="0" />
+            </REGION>
+            <REGION REF="4">
+                <P VAR="u" VALUE="[2]" />
+                <P VAR="v" VALUE="[2]" />
+                <P VAR="w" VALUE="[2]" />
+                <P VAR="p" VALUE="[2]" />
+            </REGION>
+            <REGION REF="5">
+                <N VAR="u" VALUE="0" />
+                <D VAR="v" VALUE="0" />
+                <N VAR="w" VALUE="0" />
+                <N VAR="p" USERDEFINEDTYPE="H" VALUE="0" />
+            </REGION>
+            <REGION REF="6">
+                <D VAR="u" VALUE="Uinf" />
+                <D VAR="v" VALUE="0.0" />
+                <D VAR="w" VALUE="0.0" />
+                <N VAR="p" USERDEFINEDTYPE="H" VALUE="0" />
+            </REGION>
+        </BOUNDARYCONDITIONS>
+        <FUNCTION NAME="InitialConditions">
+            <F VAR="u,v,w" FILE="restart.fld" />
+            <E VAR="p" VALUE="0" />
+        </FUNCTION>
+    </CONDITIONS>
+    <FILTERS>
+        <FILTER TYPE="Checkpoint">
+            <PARAM NAME="OutputFile">checkpoint</PARAM>
+            <PARAM NAME="OutputFrequency">100</PARAM>
+        </FILTER>
+        <FILTER TYPE="AeroForces">
+            <PARAM NAME="OutputFile">wing_forces</PARAM>
+            <PARAM NAME="OutputFrequency">1</PARAM>
+            <PARAM NAME="Boundary">B[0]</PARAM>
+        </FILTER>
+        <FILTER TYPE="ModalEnergy">
+            <PARAM NAME="OutputFile">modal_energy</PARAM>
+            <PARAM NAME="OutputFrequency">1</PARAM>
+        </FILTER>
+    </FILTERS>
+</NEKTAR>
