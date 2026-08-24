@@ -9,6 +9,7 @@ nektar_script_dir="$project_dir/scripts/nektar"
 source "$nektar_script_dir/container_images.sh"
 
 force=false
+production=true
 skip_star=false
 power_on_demand=false
 star_processes=1
@@ -80,17 +81,25 @@ usage() {
     cat <<'EOF'
 Usage: scripts/workflow/run_remote_pipeline.sh [options]
 
-Run the validated NACA0012 pipeline:
-  STAR volume mesh + CCM export
-  -> linear NekMesh import and VTU
-  -> configurable CAD projection and native high-order VTU
-  -> configurable prism split and native high-order VTU
-  -> scaled-Jacobian validation and focused quality report
+Run the validated NACA0012 pipeline. Diagnostic mode retains the linear,
+projected and final VTUs plus intermediate quality reports. Production mode
+writes only the final NekMesh mesh/restart products and one final validity
+log; STAR handoff artifacts remain available for reuse or explicit cleanup.
 
 Options:
   --power-on-demand  Run STAR in Power-on-Demand mode. STAR_POD_KEY must be
                      present in the environment; it is not logged or passed
                      to the containers.
+  --production       Run the lean production DAG: no diagnostic VTUs,
+                     discarded periodic preflight, intermediate XMLs or
+                     pre-split Jacobian audit. STAR RANS and the chained
+                     high-order mesh transformation run concurrently; required
+                     module handoffs use private temporary XMLs and one final
+                     periodic/Jacobian gate is retained.
+                     This is the default.
+  --diagnostic       Retain tutorial checkpoints, intermediate XMLs, detailed
+                     quality reports and inspection VTUs. Use this to diagnose
+                     a failed production run.
   --star-np N        Process count for every STAR stage (default: 1)
   --rans-np N        Override the process count for RANS only
                      (default: same as --star-np)
@@ -112,7 +121,7 @@ Options:
   --bl-layers N      Final NekMesh layers per STAR macro prism (default: 6)
   --bl-ratio R       Outward geometric layer-thickness ratio (default: 1.5)
   --bl-nq N          BL module quadrature points (default: P+1)
-  --jac-threshold J  Detailed final Jacobian histogram cutoff (default: 0.7)
+  --jac-threshold J  Diagnostic-mode Jacobian histogram cutoff (default: 0.7)
 
 Optional spanwise periodic alignment:
   --periodic-span    Require matching SpanMin/SpanMax meshes and run peralign
@@ -193,10 +202,33 @@ scripts/nektar/container_images.sh.
 EOF
 }
 
+# Background branch jobs inherit traps, so restrict the user-facing hint to
+# the original pipeline shell. This reports failures from explicit exits as
+# well as ordinary command errors without duplicating the message.
+pipeline_shell_pid=$BASHPID
+print_failure_hint() {
+    local status=$?
+    if ((status != 0)) && [[ "$production" == true ]] &&
+        [[ "$BASHPID" == "$pipeline_shell_pid" ]]; then
+        printf '\n[pipeline] production run failed. Re-run with diagnostic checkpoints:\n' >&2
+        printf '  ./execute.sh --diagnostic\n' >&2
+        printf 'or add --diagnostic to scripts/workflow/run_remote_pipeline.sh.\n' >&2
+    fi
+}
+trap print_failure_hint EXIT
+
 while (($#)); do
     case "$1" in
         --power-on-demand)
             power_on_demand=true
+            shift
+            ;;
+        --production)
+            production=true
+            shift
+            ;;
+        --diagnostic)
+            production=false
             shift
             ;;
         --star-np)
@@ -1000,26 +1032,37 @@ if [[ "$skip_star" == true ]]; then
     printf '  note: STAR mesh values are descriptive under --skip-star; they do not modify the reused CCM\n'
     printf '        --star-prism-height must match that CCM for the derived height to be meaningful\n'
 fi
+if [[ "$production" == true ]]; then
+    printf '  pipeline mode               : production (temporary module handoffs, no diagnostic VTUs)\n'
+else
+    printf '  pipeline mode               : diagnostic checkpoints\n'
+fi
 
 generated_outputs=(
-    "nekmesh/${linear_stem}_linear.xml"
-    "nekmesh/${linear_stem}_linear.vtu"
-    "nekmesh/${projected_stem}.xml"
-    "nekmesh/${projected_stem}.vtu"
     "nekmesh/${final_stem}.xml"
-    "nekmesh/${final_stem}.vtu"
-    "$quality_file"
     "logs/${case_name}_star_driver.log"
-    "logs/${linear_stem}_linear_import.log"
-    "logs/${linear_stem}_linear_fieldconvert.log"
-    "logs/${projected_stem}_projectcad.log"
-    "logs/${projected_stem}_jac.log"
-    "logs/${projected_stem}_fieldconvert.log"
-    "logs/${final_stem}_split.log"
-    "logs/${final_stem}_jac.log"
-    "logs/${final_stem}_fieldconvert.log"
     "logs/${case_name}_pipeline.provenance.txt"
 )
+if [[ "$production" == true ]]; then
+    generated_outputs+=("logs/${final_stem}_production.log")
+else
+    generated_outputs+=(
+        "nekmesh/${linear_stem}_linear.xml"
+        "nekmesh/${linear_stem}_linear.vtu"
+        "nekmesh/${projected_stem}.xml"
+        "nekmesh/${projected_stem}.vtu"
+        "nekmesh/${final_stem}.vtu"
+        "$quality_file"
+        "logs/${linear_stem}_linear_import.log"
+        "logs/${linear_stem}_linear_fieldconvert.log"
+        "logs/${projected_stem}_projectcad.log"
+        "logs/${projected_stem}_jac.log"
+        "logs/${projected_stem}_fieldconvert.log"
+        "logs/${final_stem}_split.log"
+        "logs/${final_stem}_jac.log"
+        "logs/${final_stem}_fieldconvert.log"
+    )
+fi
 if [[ -n "$star_step" && "$skip_star" != true ]]; then
     generated_outputs+=(
         "$star_template"
@@ -1028,7 +1071,7 @@ if [[ -n "$star_step" && "$skip_star" != true ]]; then
         "logs/${case_name}_bootstrap_driver.log"
     )
 fi
-if [[ "$periodic_span" == true ]]; then
+if [[ "$periodic_span" == true && "$production" != true ]]; then
     generated_outputs+=(
         "nekmesh/${periodic_check_stem}.xml"
         "nekmesh/${split_stem}.xml"
@@ -1051,9 +1094,11 @@ fi
 if [[ -n "$rans_session" ]]; then
     generated_outputs+=(
         "nekmesh/${case_name}_rans_initial.fld"
-        "nekmesh/${case_name}_rans_initial.vtu"
         "logs/${case_name}_rans_interpolation.log"
     )
+    if [[ "$production" != true ]]; then
+        generated_outputs+=("nekmesh/${case_name}_rans_initial.vtu")
+    fi
     if [[ "$rans_session_auto" == true ]]; then
         generated_outputs+=(
             "$rans_session"
@@ -1199,6 +1244,11 @@ run_rans_stage() {
     if [[ "$rans_allow_unconverged" == true ]]; then
         rans_args+=(--allow-unconverged)
     fi
+    if [[ "$production" == true ]]; then
+        # The committed Nektar session initializes pressure independently.
+        # Avoid exporting and interpolating a fourth, unused field.
+        rans_args+=(--velocity-only --single-session)
+    fi
     if [[ "$power_on_demand" == true ]]; then
         STAR_POD_KEY="$pod_key" "$script_dir/run_star_rans.sh" \
             "${rans_args[@]}" --power-on-demand
@@ -1244,6 +1294,69 @@ validate_peralign() {
     fi
 }
 
+run_production_nektar_stage() {
+    local temporary_dir projected_xml split_xml periodic_xml status
+    temporary_dir="$(mktemp -d "nekmesh/.${case_name}_production.XXXXXX")"
+    projected_xml="$temporary_dir/projected.xml"
+    split_xml="$temporary_dir/split.xml"
+    periodic_xml="$temporary_dir/periodic.xml"
+
+    # ProcessBL needs the prism boundary-face associations reconstructed by an
+    # OutputNekpp/InputNekpp boundary after projectcad. Chaining these two
+    # modules in memory produces "Neither Triangular Faces ... associated with
+    # Boundary" with Nektar++ 5.10. Keep the validated serialization boundary,
+    # but make its XML private and ephemeral.
+    "$nektar_script_dir/nekmesh_docker.sh" -f -v \
+        -m "projectcad:file=${cad_file}:order=${cad_order}" \
+        "$ccm_file" "$projected_xml" || {
+        status=$?
+        rm -rf -- "$temporary_dir"
+        return "$status"
+    }
+
+    "$nektar_script_dir/nekmesh_docker.sh" -f -v \
+        -m "bl:surf=${bl_surface}:layers=${bl_layers}:r=${bl_ratio}:nq=${bl_nq}" \
+        "$projected_xml" "$split_xml" || {
+        status=$?
+        rm -rf -- "$temporary_dir"
+        return "$status"
+    }
+
+    if [[ "$periodic_span" == true ]]; then
+        # The hybrid-mesh orientation pass also requires the split mesh as a
+        # reconstructed input. It drops some high-order curvature, so restore
+        # CAD curvature in the following invocation.
+        "$nektar_script_dir/nekmesh_docker.sh" -f -v \
+            -m "peralign:surf1=${periodic_surf1}:surf2=${periodic_surf2}:dir=${periodic_dir}:orient:tolfac=${periodic_tolfac}:abstol=${periodic_abstol}" \
+            "$split_xml" "$periodic_xml" || {
+            status=$?
+            rm -rf -- "$temporary_dir"
+            return "$status"
+        }
+        "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
+            -m "projectcad:file=${cad_file}:order=${cad_order}" \
+            "$periodic_xml" "nekmesh/${final_stem}.xml" || {
+            status=$?
+            rm -rf -- "$temporary_dir"
+            return "$status"
+        }
+    else
+        mv -- "$split_xml" "nekmesh/${final_stem}.xml" || {
+            status=$?
+            rm -rf -- "$temporary_dir"
+            return "$status"
+        }
+    fi
+
+    "$nektar_script_dir/nekmesh_docker.sh" -v -m "jac:quality" \
+        "nekmesh/${final_stem}.xml" unused:stdout || {
+        status=$?
+        rm -rf -- "$temporary_dir"
+        return "$status"
+    }
+    rm -rf -- "$temporary_dir"
+}
+
 started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 if [[ "$skip_star" != true ]]; then
@@ -1256,128 +1369,191 @@ if [[ "$skip_star" != true ]]; then
 else
     printf '[pipeline] skipping STAR meshing; reusing %s\n' "$ccm_file"
     if [[ "$run_rans" == true ]]; then
-        printf '[pipeline] STAR RANS remains enabled and will run after the linear/periodic preflight\n'
+        if [[ "$production" == true ]]; then
+            printf '[pipeline] STAR RANS remains enabled and will run concurrently with NekMesh\n'
+        else
+            printf '[pipeline] STAR RANS remains enabled and will run after the linear/periodic preflight\n'
+        fi
     else
         printf '[pipeline] STAR RANS is disabled\n'
     fi
 fi
 require_nonempty "$ccm_file"
 
-if [[ "$run_rans" != true ]]; then
+if [[ "$production" == true ]]; then
+    # Once STAR has published immutable SIM/CCM artifacts, RANS and NekMesh
+    # have disjoint inputs. Run both branches concurrently and join them before
+    # restart interpolation. The individual stage logs remain independent.
+    rans_pid=""
+    if [[ "$run_rans" == true ]]; then
+        printf '[pipeline] launching concurrent STAR RANS and NekMesh branches\n'
+        run_stage "STAR steady SST RANS precursor" \
+            "logs/${case_name}_rans_driver.log" run_rans_stage &
+        rans_pid=$!
+    else
+        pod_key=""
+    fi
+
+    set +e
+    run_stage "production high-order mesh transformation" \
+        "logs/${final_stem}_production.log" run_production_nektar_stage
+    nektar_status=$?
+    rans_status=0
+    if [[ -n "$rans_pid" ]]; then
+        wait "$rans_pid"
+        rans_status=$?
+    fi
+    set -e
     pod_key=""
-fi
 
-run_stage "linear CCM import" "logs/${linear_stem}_linear_import.log" \
-    "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
-    "$ccm_file" "nekmesh/${linear_stem}_linear.xml"
-require_nonempty "nekmesh/${linear_stem}_linear.xml"
+    if ((nektar_status != 0 || rans_status != 0)); then
+        printf '[pipeline] concurrent branches failed: NekMesh=%s, RANS=%s\n' \
+            "$nektar_status" "$rans_status" >&2
+        exit 1
+    fi
 
-run_stage "linear VTU export" "logs/${linear_stem}_linear_fieldconvert.log" \
-    "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
-    "nekmesh/${linear_stem}_linear.xml" "nekmesh/${linear_stem}_linear.vtu"
-require_nonempty "nekmesh/${linear_stem}_linear.vtu"
+    require_nonempty "nekmesh/${final_stem}.xml"
+    if [[ "$periodic_span" == true ]]; then
+        validate_peralign "logs/${final_stem}_production.log"
+    fi
+    validate_jacobians "logs/${final_stem}_production.log"
+    if [[ "$run_rans" == true ]]; then
+        require_nonempty "star/${case_name}_rans_nektar.csv"
+    fi
+else
+    if [[ "$run_rans" != true ]]; then
+        pod_key=""
+    fi
 
-if [[ "$periodic_span" == true ]]; then
-    # This first pass is deliberately discarded. It cheaply proves that the
-    # two STAR composites are one-to-one before a RANS solve or HO processing.
-    run_stage "spanwise periodic preflight" "logs/${case_name}_peralign_preflight.log" \
+    run_stage "linear CCM import" "logs/${linear_stem}_linear_import.log" \
         "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
-        -m "peralign:surf1=${periodic_surf1}:surf2=${periodic_surf2}:dir=${periodic_dir}:orient:tolfac=${periodic_tolfac}:abstol=${periodic_abstol}" \
-        "nekmesh/${linear_stem}_linear.xml" "nekmesh/${periodic_check_stem}.xml"
-    validate_peralign "logs/${case_name}_peralign_preflight.log"
-    require_nonempty "nekmesh/${periodic_check_stem}.xml"
-fi
+        "$ccm_file" "nekmesh/${linear_stem}_linear.xml"
+    require_nonempty "nekmesh/${linear_stem}_linear.xml"
 
-# For a periodic run, do not spend RANS iterations until peralign has proved
-# that the newly generated STAR span meshes have a one-to-one pairing.
-if [[ "$run_rans" == true ]]; then
-    run_stage "STAR steady SST RANS precursor" \
-        "logs/${case_name}_rans_driver.log" run_rans_stage
-    require_nonempty "star/${case_name}_rans_nektar.csv"
-    pod_key=""
-fi
+    run_stage "linear VTU export" "logs/${linear_stem}_linear_fieldconvert.log" \
+        "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
+        "nekmesh/${linear_stem}_linear.xml" "nekmesh/${linear_stem}_linear.vtu"
+    require_nonempty "nekmesh/${linear_stem}_linear.vtu"
 
-run_stage "order-${cad_order} CAD projection" "logs/${projected_stem}_projectcad.log" \
-    "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
-    -m "projectcad:file=${cad_file}:order=${cad_order}" \
-    "nekmesh/${linear_stem}_linear.xml" "nekmesh/${projected_stem}.xml"
-require_nonempty "nekmesh/${projected_stem}.xml"
+    if [[ "$periodic_span" == true ]]; then
+        # This first pass is deliberately discarded. It cheaply proves that
+        # the two STAR composites are one-to-one before a RANS solve or HO
+        # processing.
+        run_stage "spanwise periodic preflight" \
+            "logs/${case_name}_peralign_preflight.log" \
+            "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
+            -m "peralign:surf1=${periodic_surf1}:surf2=${periodic_surf2}:dir=${periodic_dir}:orient:tolfac=${periodic_tolfac}:abstol=${periodic_abstol}" \
+            "nekmesh/${linear_stem}_linear.xml" \
+            "nekmesh/${periodic_check_stem}.xml"
+        validate_peralign "logs/${case_name}_peralign_preflight.log"
+        require_nonempty "nekmesh/${periodic_check_stem}.xml"
+    fi
 
-run_stage "order-${cad_order} Jacobian check" "logs/${projected_stem}_jac.log" \
-    "$nektar_script_dir/nekmesh_docker.sh" -v -m jac:quality \
-    "nekmesh/${projected_stem}.xml" unused:stdout
-validate_jacobians "logs/${projected_stem}_jac.log"
+    # In diagnostic mode, do not spend RANS iterations until the disposable
+    # preflight has proved one-to-one periodic pairing.
+    if [[ "$run_rans" == true ]]; then
+        run_stage "STAR steady SST RANS precursor" \
+            "logs/${case_name}_rans_driver.log" run_rans_stage
+        require_nonempty "star/${case_name}_rans_nektar.csv"
+        pod_key=""
+    fi
 
-run_stage "order-${cad_order} native high-order VTU" "logs/${projected_stem}_fieldconvert.log" \
-    "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
-    "nekmesh/${projected_stem}.xml" "nekmesh/${projected_stem}.vtu:vtu:highorder"
-require_nonempty "nekmesh/${projected_stem}.vtu"
-
-bl_output_stem="$final_stem"
-if [[ "$periodic_span" == true ]]; then
-    bl_output_stem="$split_stem"
-fi
-
-run_stage "${bl_layers}-layer prism split" "logs/${final_stem}_split.log" \
-    "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
-    -m "bl:surf=${bl_surface}:layers=${bl_layers}:r=${bl_ratio}:nq=${bl_nq}" \
-    "nekmesh/${projected_stem}.xml" "nekmesh/${bl_output_stem}.xml"
-require_nonempty "nekmesh/${bl_output_stem}.xml"
-
-if [[ "$periodic_span" == true ]]; then
-    # The installed peralign module specifically requires orient to be run
-    # after BL splitting for a tet-prism hybrid. Reordering recreates tets and
-    # drops face-interior curvature, so restore CAD curvature afterwards.
-    run_stage "final spanwise periodic alignment" "logs/${case_name}_peralign.log" \
-        "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
-        -m "peralign:surf1=${periodic_surf1}:surf2=${periodic_surf2}:dir=${periodic_dir}:orient:tolfac=${periodic_tolfac}:abstol=${periodic_abstol}" \
-        "nekmesh/${split_stem}.xml" "nekmesh/${periodic_stem}.xml"
-    validate_peralign "logs/${case_name}_peralign.log"
-    require_nonempty "nekmesh/${periodic_stem}.xml"
-
-    run_stage "post-peralign CAD curvature restoration" \
-        "logs/${final_stem}_projectcad_restore.log" \
+    run_stage "order-${cad_order} CAD projection" "logs/${projected_stem}_projectcad.log" \
         "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
         -m "projectcad:file=${cad_file}:order=${cad_order}" \
-        "nekmesh/${periodic_stem}.xml" "nekmesh/${final_stem}.xml"
-    require_nonempty "nekmesh/${final_stem}.xml"
+        "nekmesh/${linear_stem}_linear.xml" "nekmesh/${projected_stem}.xml"
+    require_nonempty "nekmesh/${projected_stem}.xml"
+
+    run_stage "order-${cad_order} Jacobian check" "logs/${projected_stem}_jac.log" \
+        "$nektar_script_dir/nekmesh_docker.sh" -v -m jac:quality \
+        "nekmesh/${projected_stem}.xml" unused:stdout
+    validate_jacobians "logs/${projected_stem}_jac.log"
+
+    run_stage "order-${cad_order} native high-order VTU" "logs/${projected_stem}_fieldconvert.log" \
+        "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
+        "nekmesh/${projected_stem}.xml" \
+        "nekmesh/${projected_stem}.vtu:vtu:highorder"
+    require_nonempty "nekmesh/${projected_stem}.vtu"
+
+    bl_output_stem="$final_stem"
+    if [[ "$periodic_span" == true ]]; then
+        bl_output_stem="$split_stem"
+    fi
+
+    run_stage "${bl_layers}-layer prism split" "logs/${final_stem}_split.log" \
+        "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
+        -m "bl:surf=${bl_surface}:layers=${bl_layers}:r=${bl_ratio}:nq=${bl_nq}" \
+        "nekmesh/${projected_stem}.xml" "nekmesh/${bl_output_stem}.xml"
+    require_nonempty "nekmesh/${bl_output_stem}.xml"
+
+    if [[ "$periodic_span" == true ]]; then
+        # The installed peralign module specifically requires orient after BL
+        # splitting for a tet-prism hybrid. Reordering recreates tets and drops
+        # face-interior curvature, so restore CAD curvature afterwards.
+        run_stage "final spanwise periodic alignment" \
+            "logs/${case_name}_peralign.log" \
+            "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
+            -m "peralign:surf1=${periodic_surf1}:surf2=${periodic_surf2}:dir=${periodic_dir}:orient:tolfac=${periodic_tolfac}:abstol=${periodic_abstol}" \
+            "nekmesh/${split_stem}.xml" "nekmesh/${periodic_stem}.xml"
+        validate_peralign "logs/${case_name}_peralign.log"
+        require_nonempty "nekmesh/${periodic_stem}.xml"
+
+        run_stage "post-peralign CAD curvature restoration" \
+            "logs/${final_stem}_projectcad_restore.log" \
+            "$nektar_script_dir/nekmesh_docker.sh" "${force_arg[@]}" -v \
+            -m "projectcad:file=${cad_file}:order=${cad_order}" \
+            "nekmesh/${periodic_stem}.xml" "nekmesh/${final_stem}.xml"
+        require_nonempty "nekmesh/${final_stem}.xml"
+    fi
+
+    run_stage "split-mesh Jacobian audit" "logs/${final_stem}_jac.log" \
+        "$nektar_script_dir/nekmesh_docker.sh" -v \
+        -m "jac:histo=${jac_threshold},14,8:quality:detail:histofile=${quality_file}" \
+        "nekmesh/${final_stem}.xml" unused:stdout
+    validate_jacobians "logs/${final_stem}_jac.log"
+    require_nonempty "$quality_file"
+
+    run_stage "split-mesh native high-order VTU" \
+        "logs/${final_stem}_fieldconvert.log" \
+        "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
+        "nekmesh/${final_stem}.xml" \
+        "nekmesh/${final_stem}.vtu:vtu:highorder"
+    require_nonempty "nekmesh/${final_stem}.vtu"
 fi
-
-run_stage "split-mesh Jacobian audit" "logs/${final_stem}_jac.log" \
-    "$nektar_script_dir/nekmesh_docker.sh" -v \
-    -m "jac:histo=${jac_threshold},14,8:quality:detail:histofile=${quality_file}" \
-    "nekmesh/${final_stem}.xml" unused:stdout
-validate_jacobians "logs/${final_stem}_jac.log"
-require_nonempty "$quality_file"
-
-run_stage "split-mesh native high-order VTU" \
-    "logs/${final_stem}_fieldconvert.log" \
-    "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
-    "nekmesh/${final_stem}.xml" \
-    "nekmesh/${final_stem}.vtu:vtu:highorder"
-require_nonempty "nekmesh/${final_stem}.vtu"
 
 if [[ -n "$rans_session" ]]; then
     if [[ "$rans_session_auto" == true ]]; then
         restart_force=()
         [[ "$force" == true ]] && restart_force=(--force)
+        restart_fields="u,v,w,p"
+        if [[ "$production" == true ]]; then
+            restart_fields="u,v,w"
+        fi
         run_stage "Nektar restart-session generation" \
             "logs/${case_name}_restart_session.log" \
             python3 "$nektar_script_dir/prepare_nektar_restart_session.py" \
             "nekmesh/${final_stem}.xml" "$rans_session" \
-            --num-modes "$rans_num_modes" "${restart_force[@]}"
+            --num-modes "$rans_num_modes" --fields "$restart_fields" \
+            "${restart_force[@]}"
         require_nonempty "$rans_session"
+    fi
+    interpolation_args=(
+        --session "$rans_session"
+        --csv "star/${case_name}_rans_nektar.csv"
+        --output "nekmesh/${case_name}_rans_initial.fld"
+        "${star_force_arg[@]}"
+    )
+    if [[ "$production" != true ]]; then
+        interpolation_args+=(--vtu "nekmesh/${case_name}_rans_initial.vtu")
     fi
     run_stage "STAR RANS field interpolation onto Nektar expansion" \
         "logs/${case_name}_rans_interpolation.log" \
         "$nektar_script_dir/rans_csv_to_nektar_fld.sh" \
-        --session "$rans_session" \
-        --csv "star/${case_name}_rans_nektar.csv" \
-        --output "nekmesh/${case_name}_rans_initial.fld" \
-        --vtu "nekmesh/${case_name}_rans_initial.vtu" \
-        "${star_force_arg[@]}"
+        "${interpolation_args[@]}"
     require_nonempty "nekmesh/${case_name}_rans_initial.fld"
-    require_nonempty "nekmesh/${case_name}_rans_initial.vtu"
+    if [[ "$production" != true ]]; then
+        require_nonempty "nekmesh/${case_name}_rans_initial.vtu"
+    fi
 fi
 
 provenance="logs/${case_name}_pipeline.provenance.txt"
@@ -1386,6 +1562,7 @@ provenance="logs/${case_name}_pipeline.provenance.txt"
     printf 'completed_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'host=%s\n' "$(hostname)"
     printf 'star_skipped=%s\n' "$skip_star"
+    printf 'production_mode=%s\n' "$production"
     printf 'star_parameters_applied=%s\n' "$([[ "$skip_star" == true ]] && printf false || printf true)"
     printf 'star_license_mode=%s\n' "$([[ "$power_on_demand" == true ]] && printf power-on-demand || printf default)"
     printf 'star_processes=%s\n' "$star_processes"
@@ -1461,16 +1638,22 @@ provenance="logs/${case_name}_pipeline.provenance.txt"
     printf 'container_runtime_request=%s\n' "${NEKTAR_CONTAINER_RUNTIME:-auto}"
     printf 'nektar_release=%s\n' "$NEKTAR_RELEASE_DEFAULT"
     printf 'nektar_image=%s\n' "${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}"
-    for output in \
-        "$cad_file" \
-        "$ccm_file" \
-        "nekmesh/${linear_stem}_linear.xml" \
-        "nekmesh/${linear_stem}_linear.vtu" \
-        "nekmesh/${projected_stem}.xml" \
-        "nekmesh/${projected_stem}.vtu" \
-        "nekmesh/${final_stem}.xml" \
-        "nekmesh/${final_stem}.vtu" \
-        "$quality_file"; do
+    provenance_outputs=(
+        "$cad_file"
+        "$ccm_file"
+        "nekmesh/${final_stem}.xml"
+    )
+    if [[ "$production" != true ]]; then
+        provenance_outputs+=(
+            "nekmesh/${linear_stem}_linear.xml"
+            "nekmesh/${linear_stem}_linear.vtu"
+            "nekmesh/${projected_stem}.xml"
+            "nekmesh/${projected_stem}.vtu"
+            "nekmesh/${final_stem}.vtu"
+            "$quality_file"
+        )
+    fi
+    for output in "${provenance_outputs[@]}"; do
         printf 'sha256[%s]=%s\n' "$output" "$(sha256sum "$output" | awk '{print $1}')"
     done
     if [[ "$run_rans" == true ]]; then
@@ -1481,7 +1664,7 @@ provenance="logs/${case_name}_pipeline.provenance.txt"
             printf 'sha256[%s]=%s\n' "$output" "$(sha256sum "$output" | awk '{print $1}')"
         done
     fi
-    if [[ "$periodic_span" == true ]]; then
+    if [[ "$periodic_span" == true && "$production" != true ]]; then
         printf 'sha256[%s]=%s\n' "nekmesh/${periodic_stem}.xml" \
             "$(sha256sum "nekmesh/${periodic_stem}.xml" | awk '{print $1}')"
     fi
@@ -1494,15 +1677,23 @@ provenance="logs/${case_name}_pipeline.provenance.txt"
 
 printf '[pipeline] complete\n'
 printf '[pipeline] final mesh: nekmesh/%s.xml\n' "$final_stem"
-printf '[pipeline] final VTU : nekmesh/%s.vtu\n' "$final_stem"
+if [[ "$production" != true ]]; then
+    printf '[pipeline] final VTU : nekmesh/%s.vtu\n' "$final_stem"
+fi
 if [[ "$run_rans" == true ]]; then
     printf '[pipeline] RANS CSV  : star/%s_rans_nektar.csv\n' "$case_name"
 fi
 if [[ "$periodic_span" == true ]]; then
-    printf '[pipeline] periodic  : nekmesh/%s.xml\n' "$periodic_stem"
+    if [[ "$production" == true ]]; then
+        printf '[pipeline] periodic  : embedded in final mesh orientation\n'
+    else
+        printf '[pipeline] periodic  : nekmesh/%s.xml\n' "$periodic_stem"
+    fi
 fi
 if [[ -n "$rans_session" ]]; then
     printf '[pipeline] initial fld: nekmesh/%s_rans_initial.fld\n' "$case_name"
-    printf '[pipeline] initial VTU: nekmesh/%s_rans_initial.vtu\n' "$case_name"
+    if [[ "$production" != true ]]; then
+        printf '[pipeline] initial VTU: nekmesh/%s_rans_initial.vtu\n' "$case_name"
+    fi
 fi
 printf '[pipeline] metadata  : %s\n' "$provenance"

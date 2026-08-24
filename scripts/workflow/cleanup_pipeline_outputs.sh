@@ -134,6 +134,7 @@ declare -a candidates=(
     "logs/${final_stem}_split.log"
     "logs/${final_stem}_jac.log"
     "logs/${final_stem}_fieldconvert.log"
+    "logs/${final_stem}_production.log"
     "logs/${final_stem}_projectcad_restore.log"
     "logs/${case_name}_peralign_preflight.log"
     "logs/${case_name}_peralign.log"

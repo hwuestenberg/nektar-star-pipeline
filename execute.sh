@@ -91,16 +91,25 @@ case "$RANS_ALLOW_UNCONVERGED" in
 esac
 
 if [[ -n "${STAR_STEP:-}" ]]; then
-    pipeline_args+=(--star-step "$STAR_STEP")
+    if [[ -s "$STAR_TEMPLATE" ]]; then
+        printf '[execute] reusing validated STAR template: %s\n' "$STAR_TEMPLATE"
+    else
+        printf '[execute] STAR template is absent; bootstrapping it from STEP\n'
+        pipeline_args+=(--star-step "$STAR_STEP")
+    fi
 fi
 
 if [[ -n "${STAR_EXECUTABLE:-}" ]]; then
     pipeline_args+=(--star-executable "$STAR_EXECUTABLE")
 fi
 
+# Forward explicit workflow overrides after the configured defaults. In
+# particular, ./execute.sh --diagnostic restores all tutorial checkpoints.
+pipeline_args+=("$@")
+
 case "$STAR_LICENSE_MODE" in
     default)
-        exec ./scripts/workflow/run_remote_pipeline.sh "${pipeline_args[@]}"
+        ./scripts/workflow/run_remote_pipeline.sh "${pipeline_args[@]}"
         ;;
     power-on-demand)
         read -rsp 'STAR PoD key: ' star_pod_key
@@ -116,3 +125,17 @@ case "$STAR_LICENSE_MODE" in
         exit 2
         ;;
 esac
+
+solver_processes="${NEKTAR_SOLVER_NP:-1}"
+if [[ ! "$solver_processes" =~ ^[1-9][0-9]*$ ]]; then
+    echo "NEKTAR_SOLVER_NP must be a positive integer: $solver_processes" >&2
+    exit 2
+fi
+final_mesh="nekmesh/${CASE_NAME}_p${CAD_ORDER}_bl${BL_LAYERS}.xml"
+restart_field="nekmesh/${CASE_NAME}_rans_initial.fld"
+
+printf '\n[execute] pipeline completed. Run the Nektar++ simulation next:\n'
+printf '  ./scripts/workflow/run_nektar_solver.sh --force \\\n'
+printf '    --mesh %q \\\n' "$final_mesh"
+printf '    --restart %q \\\n' "$restart_field"
+printf '    --reynolds %q --np %q\n' "$RANS_REYNOLDS" "$solver_processes"
