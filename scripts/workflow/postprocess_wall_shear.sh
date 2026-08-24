@@ -207,6 +207,8 @@ wss_audit_log="$temporary_dir/wss_audit.log"
 pressure_request="$temporary_dir/raw_pressure.fld"
 pressure_audit="$temporary_dir/pressure_audit.fld"
 pressure_audit_log="$temporary_dir/pressure_audit.log"
+temporary_wss_csv="$temporary_dir/wss.csv"
+temporary_pressure_csv="$temporary_dir/pressure.csv"
 
 # FieldConvert does not expose the solver's -P parameter override. Reproduce
 # the actual solver Reynolds value in a private session so Kinvis=1/Reynolds
@@ -325,16 +327,28 @@ fi
 # portable; only the preceding volume WSS/extract operations use MPI.
 env NEKTAR_FIELDCONVERT_NP=1 \
     "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
-    "$surface_xml" "$wss_fld" "$wss_csv"
+    "$surface_xml" "$wss_fld" "$temporary_wss_csv"
 env NEKTAR_FIELDCONVERT_NP=1 \
     "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
     "$surface_xml" "$wss_fld" "$wss_vtu:vtu:highorder"
 env NEKTAR_FIELDCONVERT_NP=1 \
     "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
-    "$surface_xml" "$pressure_fld" "$pressure_csv"
+    "$surface_xml" "$pressure_fld" "$temporary_pressure_csv"
 env NEKTAR_FIELDCONVERT_NP=1 \
     "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
     "$surface_xml" "$pressure_fld" "$pressure_vtu:vtu:highorder"
+
+# Validate the exact CSV contract consumed by plot_surface_fields.py before
+# publishing either file. This catches malformed rows and non-finite values
+# introduced during point interpolation, in addition to the FLD norm audits.
+if ! python3 "$nektar_script_dir/plot_surface_fields.py" \
+    "$temporary_wss_csv" "$temporary_pressure_csv" --validate-only; then
+    echo "FieldConvert CSV output is not valid for chordwise plotting." >&2
+    echo "Inspect the source mean field for non-finite Wing values." >&2
+    exit 1
+fi
+mv -f -- "$temporary_wss_csv" "$wss_csv"
+mv -f -- "$temporary_pressure_csv" "$pressure_csv"
 
 [[ -s "$surface_xml" && -s "$wss_fld" && -s "$wss_csv" && -s "$wss_vtu" &&
     -s "$pressure_fld" && -s "$pressure_csv" && -s "$pressure_vtu" ]] || {

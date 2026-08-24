@@ -110,10 +110,11 @@ def test_wall_shear_postprocess_publishes_native_shear_only() -> None:
     assert 'extract:bnd=${boundary_id}' in script
     assert script.count('NEKTAR_FIELDCONVERT_NP="$processes"') == 2
     assert script.count("NEKTAR_FIELDCONVERT_NP=1") == 7
-    assert '"$surface_xml" "$wss_fld" "$wss_csv"' in script
+    assert '"$surface_xml" "$wss_fld" "$temporary_wss_csv"' in script
     assert '"$surface_xml" "$wss_fld" "$wss_vtu:vtu:highorder"' in script
-    assert '"$surface_xml" "$pressure_fld" "$pressure_csv"' in script
+    assert '"$surface_xml" "$pressure_fld" "$temporary_pressure_csv"' in script
     assert '"$surface_xml" "$pressure_fld" "$pressure_vtu:vtu:highorder"' in script
+    assert '"$temporary_wss_csv" "$temporary_pressure_csv" --validate-only' in script
 
     runner = (
         ROOT / "scripts/workflow/run_nektar_solver.sh"

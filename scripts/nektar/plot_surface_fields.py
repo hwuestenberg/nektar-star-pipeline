@@ -66,6 +66,11 @@ def parse_arguments() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--dpi", type=int, default=180, help="PNG DPI (default: 180)")
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="validate both CSV inputs without importing matplotlib or writing plots",
+    )
     args = parser.parse_args()
 
     if not math.isfinite(args.chord) or args.chord <= 0.0:
@@ -205,6 +210,10 @@ def main() -> int:
     try:
         shear = read_samples(args.wss_csv, "shear_mag")
         pressure = read_samples(args.pressure_csv, "p")
+        if args.validate_only:
+            print(f"WSS CSV      : {len(shear)} finite rows")
+            print(f"Pressure CSV : {len(pressure)} finite rows")
+            return 0
         shear_data = chordwise_average(
             shear, args.leading_edge_x, args.chord, args.x_tolerance
         )

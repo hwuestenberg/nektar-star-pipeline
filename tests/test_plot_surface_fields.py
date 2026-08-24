@@ -59,3 +59,28 @@ def test_plot_surface_fields_rejects_missing_field(tmp_path: Path) -> None:
 
     assert result.returncode != 0
     assert "shear_mag" in result.stderr.lower()
+
+
+def test_validate_only_rejects_nonfinite_pressure(tmp_path: Path) -> None:
+    wss = tmp_path / "wss.csv"
+    pressure = tmp_path / "pressure.csv"
+    wss.write_text(
+        "# x,y,z,Shear_mag\n0,0,0,0.1\n", encoding="utf-8"
+    )
+    pressure.write_text("# x,y,z,p\n0,0,0,-nan\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            str(wss),
+            str(pressure),
+            "--validate-only",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "non-finite" in result.stderr.lower()
