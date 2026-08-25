@@ -6,67 +6,21 @@ from __future__ import annotations
 import argparse
 import csv
 import math
-import re
 import statistics
 from pathlib import Path
 
-FIELD_ALIASES = {
-    "x": (r"^x(?:coordinate)?(?:m)?$",),
-    "y": (r"^y(?:coordinate)?(?:m)?$",),
-    "z": (r"^z(?:coordinate)?(?:m)?$",),
-    "u": (
-        r"^u(?:ms)?$",
-        r"^velocity(?:component)?(?:x|i|0)(?:component)?(?:ms)?$",
-        r"^velocity(?:ms)?(?:component)?(?:x|i|0)$",
-        r"^(?:x|i)velocity(?:ms)?$",
-    ),
-    "v": (
-        r"^v(?:ms)?$",
-        r"^velocity(?:component)?(?:y|j|1)(?:component)?(?:ms)?$",
-        r"^velocity(?:ms)?(?:component)?(?:y|j|1)$",
-        r"^(?:y|j)velocity(?:ms)?$",
-    ),
-    "w": (
-        r"^w(?:ms)?$",
-        r"^velocity(?:component)?(?:z|k|2)(?:component)?(?:ms)?$",
-        r"^velocity(?:ms)?(?:component)?(?:z|k|2)$",
-        r"^(?:z|k)velocity(?:ms)?$",
-    ),
-    "p": (
-        r"^p(?:pa)?$",
-        r"^(?:static)?pressure(?:pa)?$",
-    ),
-}
-
-
-def canonical_header(value: str) -> str:
-    value = value.strip().strip('"').lower()
-    value = value.replace("[", "").replace("]", "")
-    value = value.replace("(", "").replace(")", "")
-    return re.sub(r"[^a-z0-9]+", "", value)
+try:
+    from csv_headers import canonical_header, find_aliased_column, row_contains_x_alias
+except ImportError:
+    from scripts.nektar.csv_headers import (
+        canonical_header,
+        find_aliased_column,
+        row_contains_x_alias,
+    )
 
 
 def find_column(headers: list[str], field: str, explicit: str | None) -> int:
-    if explicit is not None:
-        for index, header in enumerate(headers):
-            if header == explicit or canonical_header(header) == canonical_header(
-                explicit
-            ):
-                return index
-        raise ValueError(f"requested {field} column not found: {explicit!r}")
-
-    normalized = [canonical_header(header) for header in headers]
-    matches = [
-        index
-        for index, header in enumerate(normalized)
-        if any(re.fullmatch(pattern, header) for pattern in FIELD_ALIASES[field])
-    ]
-    if len(matches) != 1:
-        raise ValueError(
-            f"could not identify one {field!r} column; headers are {headers!r}. "
-            f"Use --{field}-column to select it explicitly."
-        )
-    return matches[0]
+    return find_aliased_column(headers, field, explicit)
 
 
 def read_star_table(path: Path) -> tuple[list[str], list[list[str]]]:
@@ -82,11 +36,7 @@ def read_star_table(path: Path) -> tuple[list[str], list[list[str]]]:
     header_index = None
     for index, row in enumerate(rows):
         normalized = {canonical_header(cell) for cell in row}
-        if any(
-            re.fullmatch(pattern, value)
-            for value in normalized
-            for pattern in FIELD_ALIASES["x"]
-        ):
+        if row_contains_x_alias(normalized):
             header_index = index
             break
     if header_index is None:

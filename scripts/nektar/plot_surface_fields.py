@@ -10,6 +10,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import NamedTuple
 
+try:
+    from csv_headers import normalized_header
+except ImportError:
+    from scripts.nektar.csv_headers import normalized_header
+
 
 class Sample(NamedTuple):
     x: float
@@ -82,10 +87,6 @@ def parse_arguments() -> argparse.Namespace:
     if args.dpi <= 0:
         parser.error("--dpi must be positive")
     return args
-
-
-def normalized_header(name: str) -> str:
-    return name.lstrip("#").strip().lower()
 
 
 def read_samples(path: Path, field: str) -> list[Sample]:
