@@ -18,7 +18,7 @@ provenance_file="star/naca0012_linear.provenance.txt"
 macro_file="$project_dir/scripts/star/ExportCcm.java"
 configure_macro="$project_dir/scripts/star/ConfigureMesh.java"
 star_executable="$default_star_executable"
-processes=1
+processes="${MPI_NP:-1}"
 force=false
 dry_run=false
 power_on_demand=false
@@ -64,7 +64,8 @@ Options:
                         (default: star/naca0012_star_batch.log)
   --provenance FILE     Reproducibility metadata
                         (default: star/naca0012_linear.provenance.txt)
-  --np N                STAR process count (default: 1)
+  --np N                STAR process count
+                        (default: MPI_NP from the environment, or 1)
   --mesh-operation NAME Automated Mesh operation name
                         (default: NACA0012_AutomatedMesh)
   --wing-control NAME   Wing Surface Custom Mesh Control name

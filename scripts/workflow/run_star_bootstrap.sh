@@ -13,7 +13,7 @@ output_sim="star/naca0012_periodic_template.sim"
 log_file="star/naca0012_bootstrap.log"
 provenance_file="star/naca0012_bootstrap.provenance.txt"
 star_executable="${STAR_EXECUTABLE:-starccm+}"
-processes=1
+processes="${MPI_NP:-1}"
 periodic_span=true
 periodic_translation_x_m=0.0
 periodic_translation_y_m=0.0
@@ -40,7 +40,8 @@ Options:
   --log FILE           STAR bootstrap log
                        (default: star/naca0012_bootstrap.log)
   --provenance FILE    Bootstrap metadata
-  --np N               STAR launcher process count (default: 1)
+  --np N               STAR launcher process count
+                       (default: MPI_NP from the environment, or 1)
   --periodic-span      Create SpanMin/SpanMax periodic interface (default)
   --no-periodic-span   Leave SpanMin and SpanMax as ordinary boundaries
   --periodic-translation-x M

@@ -14,7 +14,7 @@ force=false
 production=true
 skip_star=false
 power_on_demand=false
-star_processes=1
+star_processes="${MPI_NP:-1}"
 rans_processes=""
 star_executable=""
 star_template="star/naca0012_mesh_template.sim"
@@ -102,7 +102,8 @@ Options:
   --diagnostic       Retain tutorial checkpoints, intermediate XMLs, detailed
                      quality reports and inspection VTUs. Use this to diagnose
                      a failed production run.
-  --star-np N        Process count for every STAR stage (default: 1)
+  --star-np N        Process count for every STAR stage
+                     (default: MPI_NP from the environment, or 1)
   --rans-np N        Override the process count for RANS only
                      (default: same as --star-np)
   --star-executable FILE       STAR-CCM+ launcher path

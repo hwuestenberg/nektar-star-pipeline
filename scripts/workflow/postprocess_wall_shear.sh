@@ -42,7 +42,8 @@ Options:
   --reynolds RE       Override the session Reynolds parameter
                       (default: 684587.012)
   --np N              MPI ranks for the expensive wss and boundary-extract
-                      modules (default: 1)
+                      modules (default: 1; not derived from MPI_NP even
+                      when set)
                       Nektar++ 5.10.0 is only validated here with N=1;
                       every result is rejected if its field norms are non-finite
   --force             Replace existing outputs

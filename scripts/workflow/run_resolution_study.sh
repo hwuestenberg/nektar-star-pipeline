@@ -12,7 +12,7 @@ execute=false
 force=false
 power_on_demand=false
 periodic_span=false
-star_processes=1
+star_processes="${MPI_NP:-1}"
 star_template="star/naca0012_mesh_template.sim"
 star_periodic_interface="SpanwisePeriodic"
 name_prefix="naca0012_star"
@@ -41,7 +41,8 @@ Options:
   --power-on-demand     Supply STAR_POD_KEY to each STAR invocation
   --periodic-span       Require SpanMin/SpanMax peralign at every level
   --force               Permit replacement of each variant's outputs
-  --star-np N           STAR process count (default: 1)
+  --star-np N           STAR process count
+                        (default: MPI_NP from the environment, or 1)
   --star-template FILE  Prepared STAR template (use a conformal periodic
                         template together with --periodic-span)
   --star-periodic-interface NAME

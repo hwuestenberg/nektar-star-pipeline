@@ -19,7 +19,7 @@ provenance_file="star/naca0012_rans.provenance.txt"
 star_executable="$default_star_executable"
 configure_macro="$project_dir/scripts/star/ConfigureRans.java"
 export_macro="$project_dir/scripts/star/ExportRansTable.java"
-processes=1
+processes="${MPI_NP:-1}"
 force=false
 dry_run=false
 power_on_demand=false
@@ -105,7 +105,8 @@ STAR object names:
                         (default: SpanwisePeriodic)
 
 Execution:
-  --np N                 STAR process count (default: 1)
+  --np N                 STAR process count
+                         (default: MPI_NP from the environment, or 1)
   --star-executable FILE STAR launcher command or path (default:
                          STAR_EXECUTABLE or starccm+ resolved through PATH)
   --power-on-demand      Read the PoD key from STAR_POD_KEY without logging it

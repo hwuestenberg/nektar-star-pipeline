@@ -22,7 +22,7 @@ restart_file="nekmesh/naca0012_periodic_full_rans_initial.fld"
 session_file="nektar/naca0012-periodic/session.xml"
 run_dir="nektar/naca0012-periodic/run"
 steps=100
-processes=1
+processes="${MPI_NP:-1}"
 wall_shear_processes=1
 reynolds="${RANS_REYNOLDS:-684587.012}"
 force=false
@@ -45,9 +45,11 @@ Options:
   --steps N         Override NumSteps (default: 100)
   --reynolds RE     Override Reynolds; session uses U=1 and Kinvis=1/RE
                     (default: RANS_REYNOLDS from the case configuration)
-  --np N            MPI ranks inside the container (default: 1)
+  --np N            MPI ranks inside the container
+                    (default: MPI_NP from the environment, or 1)
   --wall-shear-np N WSS FieldConvert ranks (default: 1, validated)
-                    Values >1 are experimental and rejected if non-finite
+                    Values >1 are experimental and rejected if non-finite;
+                    not derived from MPI_NP even when set
   --no-wall-shear   Skip mean-field WSS post-processing
   --wing-boundary N Nektar boundary ID for Wing (default: 0)
   --wing-surface N  NekMesh composite ID for Wing

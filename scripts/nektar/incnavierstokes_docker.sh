@@ -9,7 +9,7 @@ source "$script_dir/container_images.sh"
 source "$script_dir/run_nektar_tool.sh"
 
 solver_executable="${NEKTAR_SOLVER_EXECUTABLE:-IncNavierStokesSolver}"
-solver_processes="${NEKTAR_SOLVER_NP:-1}"
+solver_processes="${NEKTAR_SOLVER_NP:-${MPI_NP:-1}}"
 solver_workdir="${NEKTAR_SOLVER_WORKDIR:-.}"
 
 if (($# == 0)); then
@@ -19,7 +19,8 @@ Usage: scripts/nektar/incnavierstokes_docker.sh SOLVER_ARGUMENT...
 Run IncNavierStokesSolver from the same pinned full Nektar++ image used by
 FieldConvert. Paths are relative to the repository root, which is mounted at
 /data. Set NEKTAR_SOLVER_WORKDIR to a repository-relative run directory when
-session outputs should be isolated there.
+session outputs should be isolated there. Set NEKTAR_SOLVER_NP for the MPI
+rank count; it falls back to MPI_NP from the environment, then to 1.
 
 Examples:
   scripts/nektar/incnavierstokes_docker.sh --help
