@@ -85,15 +85,14 @@ pipeline_args=(
 )
 
 case "$RANS_ALLOW_UNCONVERGED" in
-    true)
-        pipeline_args+=(--rans-allow-unconverged)
-        ;;
-    false)
-        ;;
-    *)
-        echo "RANS_ALLOW_UNCONVERGED must be true or false." >&2
-        exit 2
-        ;;
+true)
+    pipeline_args+=(--rans-allow-unconverged)
+    ;;
+false) ;;
+*)
+    echo "RANS_ALLOW_UNCONVERGED must be true or false." >&2
+    exit 2
+    ;;
 esac
 
 if [[ -n "${STAR_STEP:-}" ]]; then
@@ -114,22 +113,22 @@ fi
 pipeline_args+=("$@")
 
 case "$STAR_LICENSE_MODE" in
-    default)
-        ./scripts/workflow/run_remote_pipeline.sh "${pipeline_args[@]}"
-        ;;
-    power-on-demand)
-        read -rsp 'STAR PoD key: ' star_pod_key
-        printf '\n'
-        trap 'unset star_pod_key' EXIT
-        STAR_POD_KEY="$star_pod_key" \
-            ./scripts/workflow/run_remote_pipeline.sh \
-            "${pipeline_args[@]}" --power-on-demand
-        ;;
-    *)
-        echo "Unsupported STAR_LICENSE_MODE: $STAR_LICENSE_MODE" >&2
-        echo "Expected 'default' or 'power-on-demand'." >&2
-        exit 2
-        ;;
+default)
+    ./scripts/workflow/run_remote_pipeline.sh "${pipeline_args[@]}"
+    ;;
+power-on-demand)
+    read -rsp 'STAR PoD key: ' star_pod_key
+    printf '\n'
+    trap 'unset star_pod_key' EXIT
+    STAR_POD_KEY="$star_pod_key" \
+        ./scripts/workflow/run_remote_pipeline.sh \
+        "${pipeline_args[@]}" --power-on-demand
+    ;;
+*)
+    echo "Unsupported STAR_LICENSE_MODE: $STAR_LICENSE_MODE" >&2
+    echo "Expected 'default' or 'power-on-demand'." >&2
+    exit 2
+    ;;
 esac
 
 solver_steps="${NEKTAR_SOLVER_STEPS:-100}"
@@ -163,10 +162,22 @@ printf '\n[execute] mesh/restart pipeline completed; starting Nektar++ solver\n'
     --run-dir "$solver_run_dir" \
     --steps "$solver_steps" \
     --reynolds "$RANS_REYNOLDS" \
+    --np "$processes"
+
+printf '\n[execute] complete: Nektar++ solver\n'
+printf '[execute] run directory: %s\n' "$solver_run_dir"
+
+printf '\n[execute] postprocessing wall quantities: wall shear stress and pressure\n'
+./scripts/workflow/run_nektar_postprocess.sh \
+    --mesh "$final_mesh" \
+    --session "$solver_run_dir/session.xml" \
+    --field "$solver_run_dir/mean_fields_avg.fld" \
+    --output-dir "$solver_run_dir" \
+    --prefix mean_fields_wss \
+    --boundary "$wing_boundary" \
+    --surface "$BL_SURFACE" \
     --np "$processes" \
-    --wall-shear-np "$processes" \
-    --wing-boundary "$wing_boundary" \
-    --wing-surface "$BL_SURFACE"
+    --force
 
 printf '\n[execute] complete: mesh, restart, solver, WSS and pressure outputs validated\n'
 printf '[execute] run directory: %s\n' "$solver_run_dir"

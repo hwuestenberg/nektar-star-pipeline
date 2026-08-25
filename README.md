@@ -131,16 +131,17 @@ After producing the mesh and restart, `execute.sh` directly runs
 `run_nektar_solver.sh` using the configured Reynolds number,
 `NEKTAR_SOLVER_STEPS` and the single end-to-end `MPI_NP` rank count. The same
 rank count is passed to STAR meshing, STAR RANS, the Nektar++ solver and the
-parallel-capable surface post-processing operations. The solver driver then
-computes
-the mean Wing wall-shear vector and magnitude from the final
-`mean_fields_avg.fld` produced by the `AverageFields` filter. Conversion
-to skin-friction coefficient is deliberately left to downstream analysis. It
-also extracts the mean Wing pressure into FLD, CSV and high-order VTU outputs.
-The validated Nektar++ 5.10.0 WSS path is serial and performs an automatic
-finite-norm audit before publishing the result; on the reference production
-mesh this is a substantial, memory-intensive post-process. Use
-`--no-wall-shear` for solver-only smoke tests.
+parallel-capable surface post-processing operations. Once the solver run
+completes, `execute.sh` separately runs `run_nektar_postprocess.sh` against
+that same run directory to compute the mean Wing wall-shear vector and
+magnitude from the final `mean_fields_avg.fld` produced by the `AverageFields`
+filter. Conversion to skin-friction coefficient is deliberately left to
+downstream analysis. It also extracts the mean Wing pressure into FLD, CSV and
+high-order VTU outputs. The validated Nektar++ 5.10.0 WSS path is serial and
+performs an automatic finite-norm audit before publishing the result; on the
+reference production mesh this is a substantial, memory-intensive
+post-process. Skip it by not invoking `run_nektar_postprocess.sh`, e.g. for a
+solver-only smoke test.
 
 For tutorial checkpoints and visual exports, invoke
 `./execute.sh --diagnostic`, or add `--diagnostic` when invoking
@@ -169,6 +170,7 @@ parameters are exposed through:
 ./scripts/workflow/run_star_mesh.sh --help
 ./scripts/workflow/run_star_rans.sh --help
 ./scripts/workflow/run_nektar_solver.sh --help
+./scripts/workflow/run_nektar_postprocess.sh --help
 ```
 
 The final Nektar++ inputs are:

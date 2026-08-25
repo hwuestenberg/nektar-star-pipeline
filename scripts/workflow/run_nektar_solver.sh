@@ -23,20 +23,16 @@ session_file="nektar/naca0012-periodic/session.xml"
 run_dir="nektar/naca0012-periodic/run"
 steps=100
 processes="${MPI_NP:-1}"
-wall_shear_processes=1
 reynolds="${RANS_REYNOLDS:-684587.012}"
 force=false
-wall_shear=true
-wing_boundary=0
-wing_surface="${BL_SURFACE:-4}"
 
 # materialize_session SRC DEST NUM_STEPS REYNOLDS
 # Writes a session XML with NumSteps and Reynolds replaced by their concrete
 # run-time values, instead of relying on the solver's -P command-line
 # overrides. This makes DEST a self-contained, reproducible record of the
-# exact parameters used for this run, and it is what the wall-shear
-# post-process reads directly afterward -- no separate override is needed
-# there. Kinvis remains the formula "1.0/Reynolds", so it stays consistent
+# exact parameters used for this run. run_nektar_postprocess.sh reads this
+# same file by default afterward, so it needs no separate override either.
+# Kinvis remains the formula "1.0/Reynolds", so it stays consistent
 # automatically wherever DEST is used.
 materialize_session() {
     local src="$1" dest="$2" num_steps="$3" reynolds_value="$4"
@@ -69,6 +65,8 @@ Usage: scripts/workflow/run_nektar_solver.sh [options]
 
 Stage mesh.xml, restart.fld and session.xml in an isolated Nektar++ run
 directory, then execute IncNavierStokesSolver from the pinned container.
+Run scripts/workflow/run_nektar_postprocess.sh afterward to compute wall
+shear stress and mean pressure from this run directory.
 
 Options:
   --mesh FILE       High-order mesh XML
@@ -80,13 +78,6 @@ Options:
                     (default: RANS_REYNOLDS from the case configuration)
   --np N            MPI ranks inside the container
                     (default: MPI_NP from the environment, or 1)
-  --wall-shear-np N WSS FieldConvert ranks (default: 1, validated)
-                    Values >1 are experimental and rejected if non-finite;
-                    not derived from MPI_NP even when set
-  --no-wall-shear   Skip mean-field WSS post-processing
-  --wing-boundary N Nektar boundary ID for Wing (default: 0)
-  --wing-surface N  NekMesh composite ID for Wing
-                    (default: BL_SURFACE from case config, otherwise 4)
   --force           Replace an existing staged run
   -h, --help        Show this help
 
@@ -132,25 +123,6 @@ while (($#)); do
             processes="$2"
             shift 2
             ;;
-        --wall-shear-np)
-            require_arg --wall-shear-np "$#"
-            wall_shear_processes="$2"
-            shift 2
-            ;;
-        --no-wall-shear)
-            wall_shear=false
-            shift
-            ;;
-        --wing-boundary)
-            require_arg --wing-boundary "$#"
-            wing_boundary="$2"
-            shift 2
-            ;;
-        --wing-surface)
-            require_arg --wing-surface "$#"
-            wing_surface="$2"
-            shift 2
-            ;;
         --force)
             force=true
             shift
@@ -182,14 +154,6 @@ require_repo_relative_path "--run-dir must stay inside the repository" "$run_dir
 }
 [[ "$processes" =~ ^[1-9][0-9]*$ ]] || {
     echo "--np must be a positive integer: $processes" >&2
-    exit 2
-}
-[[ "$wall_shear_processes" =~ ^[1-9][0-9]*$ ]] || {
-    echo "--wall-shear-np must be a positive integer: $wall_shear_processes" >&2
-    exit 2
-}
-[[ "$wing_boundary" =~ ^[0-9]+$ && "$wing_surface" =~ ^[0-9]+$ ]] || {
-    echo "Wing boundary/surface IDs must be non-negative integers." >&2
     exit 2
 }
 awk -v value="$reynolds" 'BEGIN { exit !(value > 0) }' || {
@@ -228,8 +192,6 @@ echo "Steps                : $steps"
 echo "Normalization        : U=1, rho=1, chord=1"
 echo "Reynolds / Kinvis    : $reynolds / $kinvis"
 echo "MPI ranks            : $processes"
-[[ "$wall_shear" != true ]] || \
-    echo "Wall-shear ranks     : $wall_shear_processes (serial is validated)"
 
 solver_log="$run_dir/solver.log"
 setsid env NEKTAR_SOLVER_WORKDIR="$run_dir" NEKTAR_SOLVER_NP="$processes" \
@@ -305,17 +267,3 @@ echo "Time-averaged field : $mean_field_path"
 find "$run_dir" -maxdepth 1 \( -type f -o -type d \) \
     \( -name '*.chk' -o -name '*.fld' \) \
     -printf 'Checkpoint/restart  : %p\n' | sort
-
-if [[ "$wall_shear" == true ]]; then
-    echo "Computing mean wing wall shear stress."
-    "$project_dir/scripts/workflow/postprocess_wall_shear.sh" \
-        --mesh "$mesh_file" \
-        --session "$run_dir/session.xml" \
-        --field "$mean_field_path" \
-        --output-dir "$run_dir" \
-        --prefix mean_fields_wss \
-        --boundary "$wing_boundary" \
-        --surface "$wing_surface" \
-        --np "$wall_shear_processes" \
-        --force
-fi

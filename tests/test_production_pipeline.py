@@ -19,18 +19,22 @@ def test_production_is_default_and_execute_forwards_diagnostics() -> None:
     assert 'pipeline_args+=("$@")' in execute
     assert "starting Nektar++ solver" in execute
     assert "run_nektar_solver.sh" in execute
-    assert "--wall-shear-np" in execute
+    assert "run_nektar_postprocess.sh" in execute
     assert 'processes="$MPI_NP"' in execute
     assert '--star-np "$processes"' in execute
     assert '--rans-np "$processes"' in execute
     assert '--np "$processes"' in execute
-    assert '--wall-shear-np "$processes"' in execute
+    assert '--session "$solver_run_dir/session.xml"' in execute
+    assert '--field "$solver_run_dir/mean_fields_avg.fld"' in execute
     assert 'NEKTAR_SOLVER_STEPS:-100' in execute
     assert 'NEKTAR_RUN_DIR:-nektar/naca0012-periodic/run' in execute
     assert "STAR_NP" not in execute
     assert "RANS_NP" not in execute
     assert "NEKTAR_SOLVER_NP" not in execute
     assert "NEKTAR_WALL_SHEAR_NP" not in execute
+    assert execute.index("run_nektar_solver.sh") < execute.index(
+        "run_nektar_postprocess.sh"
+    )
 
 
 def test_production_failure_prints_diagnostic_rerun_hint() -> None:
@@ -109,7 +113,7 @@ def test_velocity_only_restart_session(tmp_path: Path) -> None:
 
 def test_wall_shear_postprocess_publishes_native_shear_only() -> None:
     script = (
-        ROOT / "scripts/workflow/postprocess_wall_shear.sh"
+        ROOT / "scripts/workflow/run_nektar_postprocess.sh"
     ).read_text(encoding="utf-8")
 
     assert 'wss:bnd=${boundary_id}' in script
@@ -126,12 +130,16 @@ def test_wall_shear_postprocess_publishes_native_shear_only() -> None:
     assert '"$surface_xml" "$pressure_fld" "$temporary_pressure_csv"' in script
     assert '"$surface_xml" "$pressure_fld" "$pressure_vtu:vtu:highorder"' in script
     assert '"$temporary_wss_csv" "$temporary_pressure_csv" --validate-only' in script
+    assert 'field_file="nektar/naca0012-periodic/run/mean_fields_avg.fld"' in script
+    assert 'session_file="nektar/naca0012-periodic/run/session.xml"' in script
 
     runner = (
         ROOT / "scripts/workflow/run_nektar_solver.sh"
     ).read_text(encoding="utf-8")
-    assert "wall_shear_processes=1" in runner
     assert "mean_fields_avg.fld" in runner
-    assert '--field "$mean_field_path"' in runner
     assert "instantaneous_*.chk" in runner
-    assert '--np "$wall_shear_processes"' in runner
+    assert "wall_shear" not in runner
+    assert "postprocess_wall_shear.sh" not in runner
+
+    execute = (ROOT / "execute.sh").read_text(encoding="utf-8")
+    assert "run_nektar_postprocess.sh" in execute

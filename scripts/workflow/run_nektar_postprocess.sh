@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Compute wing wall shear stress from a Nektar field.
+# Post-process a completed Nektar++ run: extract mean wing pressure and
+# compute wall shear stress.
 
 set -euo pipefail
 
@@ -8,39 +9,53 @@ project_dir="$(cd -- "$script_dir/../.." && pwd)"
 nektar_script_dir="$project_dir/scripts/nektar"
 # shellcheck source=scripts/workflow/lib/common.sh
 source "$script_dir/lib/common.sh"
+case_config="${STAR_NEKTAR_CASE_CONFIG:-cases/naca0012-periodic/case.env}"
+if [[ "$case_config" != /* ]]; then
+    case_config="$project_dir/$case_config"
+fi
+if [[ -f "$case_config" ]]; then
+    # This is the same version-controlled case input consumed by execute.sh.
+    # shellcheck disable=SC1090
+    source "$case_config"
+fi
 
-mesh_file=""
-session_file=""
-field_file=""
-output_dir=""
-prefix="wing_wss"
+mesh_file="nekmesh/naca0012_periodic_full_p4_bl8.xml"
+session_file="nektar/naca0012-periodic/run/session.xml"
+field_file="nektar/naca0012-periodic/run/mean_fields_avg.fld"
+output_dir="nektar/naca0012-periodic/run"
+prefix="mean_fields_wss"
 boundary_id=0
-surface_id=4
+surface_id="${BL_SURFACE:-4}"
 processes=1
 force=false
 
 usage() {
     cat <<'EOF'
-Usage: scripts/workflow/postprocess_wall_shear.sh [options]
+Usage: scripts/workflow/run_nektar_postprocess.sh [options]
 
-Compute the wall-shear vector/magnitude and extract mean pressure on the wing
-with FieldConvert's wss and extract modules. Skin-friction normalization is
-deliberately left to downstream analysis.
-
-Required:
-  --mesh FILE       Full high-order Nektar mesh XML
-  --session FILE    Solver session XML with the Reynolds/Kinvis actually
-                    used for the run already materialized into it (e.g.
-                    RUN_DIR/session.xml written by run_nektar_solver.sh);
-                    this script reads it as-is and does not override it
-  --field FILE      Solver FLD or checkpoint file/directory; use the final
-                    AverageFields output (mean_fields_avg.fld) for mean WSS
-  --output-dir DIR  Repository-relative output directory
+Post-process a completed Nektar++ run directory: extract the mean wing
+pressure and compute the wall-shear vector/magnitude with FieldConvert's
+extract and wss modules. Skin-friction normalization is deliberately left to
+downstream analysis. Run this after run_nektar_solver.sh; the defaults below
+read that same run directory's materialized session and averaged field.
 
 Options:
-  --prefix NAME       Output prefix (default: wing_wss)
+  --mesh FILE         Full high-order Nektar mesh XML
+                      (default: nekmesh/naca0012_periodic_full_p4_bl8.xml)
+  --session FILE      Solver session XML with the Reynolds/Kinvis actually
+                      used for the run already materialized into it (the
+                      RUN_DIR/session.xml written by run_nektar_solver.sh);
+                      this script reads it as-is and does not override it
+                      (default: nektar/naca0012-periodic/run/session.xml)
+  --field FILE        Solver FLD or checkpoint file/directory; use the final
+                      AverageFields output (mean_fields_avg.fld) for mean WSS
+                      (default: nektar/naca0012-periodic/run/mean_fields_avg.fld)
+  --output-dir DIR    Repository-relative output directory
+                      (default: nektar/naca0012-periodic/run)
+  --prefix NAME       Output prefix (default: mean_fields_wss)
   --boundary ID       Nektar boundary-region ID for wss (default: 0, Wing)
-  --surface ID        NekMesh composite ID for extraction (default: 4, Wing)
+  --surface ID        NekMesh composite ID for extraction
+                      (default: BL_SURFACE from case config, otherwise 4)
   --np N              MPI ranks for the expensive wss and boundary-extract
                       modules (default: 1; not derived from MPI_NP even
                       when set)
@@ -123,12 +138,6 @@ while (($#)); do
     esac
 done
 
-for required in mesh_file session_file field_file output_dir; do
-    [[ -n "${!required}" ]] || {
-        echo "Missing required option corresponding to $required." >&2
-        exit 2
-    }
-done
 for path in "$mesh_file" "$session_file" "$field_file" "$output_dir"; do
     require_repo_relative_path "Paths must be repository-relative and colon-free" "$path"
 done
