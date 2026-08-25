@@ -16,7 +16,6 @@ output_dir=""
 prefix="wing_wss"
 boundary_id=0
 surface_id=4
-reynolds="684587.012"
 processes=1
 force=false
 
@@ -30,7 +29,10 @@ deliberately left to downstream analysis.
 
 Required:
   --mesh FILE       Full high-order Nektar mesh XML
-  --session FILE    Solver session XML containing Kinvis/Reynolds
+  --session FILE    Solver session XML with the Reynolds/Kinvis actually
+                    used for the run already materialized into it (e.g.
+                    RUN_DIR/session.xml written by run_nektar_solver.sh);
+                    this script reads it as-is and does not override it
   --field FILE      Solver FLD or checkpoint file/directory; use the final
                     AverageFields output (mean_fields_avg.fld) for mean WSS
   --output-dir DIR  Repository-relative output directory
@@ -39,8 +41,6 @@ Options:
   --prefix NAME       Output prefix (default: wing_wss)
   --boundary ID       Nektar boundary-region ID for wss (default: 0, Wing)
   --surface ID        NekMesh composite ID for extraction (default: 4, Wing)
-  --reynolds RE       Override the session Reynolds parameter
-                      (default: 684587.012)
   --np N              MPI ranks for the expensive wss and boundary-extract
                       modules (default: 1; not derived from MPI_NP even
                       when set)
@@ -102,11 +102,6 @@ while (($#)); do
             surface_id="$2"
             shift 2
             ;;
-        --reynolds)
-            require_arg --reynolds "$#"
-            reynolds="$2"
-            shift 2
-            ;;
         --np)
             require_arg --np "$#"
             processes="$2"
@@ -153,10 +148,6 @@ done
     echo "--np must be a positive integer: $processes" >&2
     exit 2
 }
-awk -v value="$reynolds" 'BEGIN { exit !(value > 0) }' || {
-    echo "--reynolds must be positive: $reynolds" >&2
-    exit 2
-}
 
 cd "$project_dir"
 [[ -s "$mesh_file" ]] || { echo "Mesh is missing or empty: $mesh_file" >&2; exit 1; }
@@ -200,7 +191,6 @@ cleanup() {
 }
 trap cleanup EXIT
 raw_request="$temporary_dir/raw_wss.fld"
-wall_session="$temporary_dir/wall_session.xml"
 wss_audit="$temporary_dir/wss_audit.fld"
 wss_audit_log="$temporary_dir/wss_audit.log"
 pressure_request="$temporary_dir/raw_pressure.fld"
@@ -209,28 +199,13 @@ pressure_audit_log="$temporary_dir/pressure_audit.log"
 temporary_wss_csv="$temporary_dir/wss.csv"
 temporary_pressure_csv="$temporary_dir/pressure.csv"
 
-# FieldConvert does not expose the solver's -P parameter override. Reproduce
-# the actual solver Reynolds value in a private session so Kinvis=1/Reynolds
-# is evaluated consistently when wss forms the viscous traction.
-awk -v reynolds="$reynolds" '
-    /<P>[[:space:]]*Reynolds[[:space:]]*=/ {
-        sub(/=.*/, "= " reynolds " </P>")
-        found=1
-    }
-    { print }
-    END { if (!found) exit 3 }
-' "$session_file" >"$wall_session" || {
-    echo "Could not override Reynolds in session: $session_file" >&2
-    exit 1
-}
-
 "$nektar_script_dir/nekmesh_docker.sh" -f -v \
     -m "extract:surf=${surface_id}" "$mesh_file" "$surface_xml"
 
 env NEKTAR_FIELDCONVERT_NP="$processes" \
     "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
     -m "wss:bnd=${boundary_id}" \
-    "$mesh_file" "$wall_session" "$field_file" "$raw_request"
+    "$mesh_file" "$session_file" "$field_file" "$raw_request"
 
 raw_wss="$raw_request"
 if [[ ! -e "$raw_wss" ]]; then
@@ -278,7 +253,7 @@ mv -f -- "$raw_wss" "$wss_fld"
 env NEKTAR_FIELDCONVERT_NP="$processes" \
     "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
     -m "extract:bnd=${boundary_id}" \
-    "$mesh_file" "$wall_session" "$field_file" "$pressure_request"
+    "$mesh_file" "$session_file" "$field_file" "$pressure_request"
 
 raw_pressure="$pressure_request"
 if [[ ! -e "$raw_pressure" ]]; then

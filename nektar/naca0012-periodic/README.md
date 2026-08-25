@@ -20,8 +20,12 @@ Nektar++ pressure-correction variable.
 
 STAR and Nektar++ share the nondimensional convention `U_inf=1`, `rho=1`, and
 `c=1`. `run_nektar_solver.sh` reads `RANS_REYNOLDS` from the case configuration
-and overrides the session's `Reynolds` parameter; the session evaluates
-`Kinvis=1/Reynolds`. Use `--reynolds RE` only for an explicit override, and
+and materializes it, together with `NumSteps`, directly into
+`RUN_DIR/session.xml`; the session evaluates `Kinvis=1/Reynolds` from that
+concrete value. This is a real, self-contained copy rather than a solver `-P`
+command-line override, so `RUN_DIR/session.xml` alone is a reproducible record
+of exactly what ran, and the wall-shear post-process reads it directly with no
+separate override. Use `--reynolds RE` only for an explicit override, and
 regenerate the STAR restart at the same Reynolds number.
 
 Run 100 steps with, for example:

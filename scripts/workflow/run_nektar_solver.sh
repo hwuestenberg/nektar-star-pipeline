@@ -30,6 +30,39 @@ wall_shear=true
 wing_boundary=0
 wing_surface="${BL_SURFACE:-4}"
 
+# materialize_session SRC DEST NUM_STEPS REYNOLDS
+# Writes a session XML with NumSteps and Reynolds replaced by their concrete
+# run-time values, instead of relying on the solver's -P command-line
+# overrides. This makes DEST a self-contained, reproducible record of the
+# exact parameters used for this run, and it is what the wall-shear
+# post-process reads directly afterward -- no separate override is needed
+# there. Kinvis remains the formula "1.0/Reynolds", so it stays consistent
+# automatically wherever DEST is used.
+materialize_session() {
+    local src="$1" dest="$2" num_steps="$3" reynolds_value="$4"
+    awk -v num_steps="$num_steps" -v reynolds_value="$reynolds_value" '
+        /<P>[[:space:]]*NumSteps[[:space:]]*=/ {
+            sub(/=.*/, "= " num_steps " </P>")
+            found_steps = 1
+        }
+        /<P>[[:space:]]*Reynolds[[:space:]]*=/ {
+            sub(/=.*/, "= " reynolds_value " </P>")
+            found_reynolds = 1
+        }
+        { print }
+        END {
+            if (!found_steps) {
+                print "NumSteps parameter not found" > "/dev/stderr"
+                exit 3
+            }
+            if (!found_reynolds) {
+                print "Reynolds parameter not found" > "/dev/stderr"
+                exit 4
+            }
+        }
+    ' "$src" >"$dest"
+}
+
 usage() {
     cat <<'EOF'
 Usage: scripts/workflow/run_nektar_solver.sh [options]
@@ -179,15 +212,18 @@ fi
 
 relative_mesh="$(realpath --relative-to="$project_dir/$run_dir" "$project_dir/$mesh_file")"
 relative_restart="$(realpath --relative-to="$project_dir/$run_dir" "$project_dir/$restart_file")"
-relative_session="$(realpath --relative-to="$project_dir/$run_dir" "$project_dir/$session_file")"
 ln -s -- "$relative_mesh" "$run_dir/mesh.xml"
 ln -s -- "$relative_restart" "$run_dir/restart.fld"
-ln -s -- "$relative_session" "$run_dir/session.xml"
+materialize_session "$project_dir/$session_file" "$run_dir/session.xml" "$steps" "$reynolds" || {
+    echo "Could not materialize NumSteps/Reynolds into the session: $session_file" >&2
+    exit 1
+}
 
 echo "Nektar run directory : $run_dir"
 echo "Mesh                 : $mesh_file"
 echo "Restart              : $restart_file"
-echo "Session              : $session_file"
+echo "Session template     : $session_file"
+echo "Materialized session : $run_dir/session.xml"
 echo "Steps                : $steps"
 echo "Normalization        : U=1, rho=1, chord=1"
 echo "Reynolds / Kinvis    : $reynolds / $kinvis"
@@ -198,8 +234,7 @@ echo "MPI ranks            : $processes"
 solver_log="$run_dir/solver.log"
 setsid env NEKTAR_SOLVER_WORKDIR="$run_dir" NEKTAR_SOLVER_NP="$processes" \
     "$project_dir/scripts/nektar/incnavierstokes_docker.sh" \
-    -f -P "NumSteps=$steps" -P "Reynolds=$reynolds" \
-    mesh.xml session.xml >"$solver_log" 2>&1 &
+    -f mesh.xml session.xml >"$solver_log" 2>&1 &
 solver_pid=$!
 
 stop_solver() {
@@ -275,13 +310,12 @@ if [[ "$wall_shear" == true ]]; then
     echo "Computing mean wing wall shear stress."
     "$project_dir/scripts/workflow/postprocess_wall_shear.sh" \
         --mesh "$mesh_file" \
-        --session "$session_file" \
+        --session "$run_dir/session.xml" \
         --field "$mean_field_path" \
         --output-dir "$run_dir" \
         --prefix mean_fields_wss \
         --boundary "$wing_boundary" \
         --surface "$wing_surface" \
-        --reynolds "$reynolds" \
         --np "$wall_shear_processes" \
         --force
 fi
