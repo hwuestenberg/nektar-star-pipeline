@@ -23,7 +23,7 @@ public class ExportRansTable extends StarMacro {
   @Override
   public void execute() {
     Simulation simulation = getActiveSimulation();
-    String regionName = requiredString("STAR_RANS_REGION");
+    String regionName = MacroSupport.requiredString("STAR_RANS_REGION");
     String simPath = requiredAbsolutePath("STAR_RANS_SIM_OUTPUT");
     String tablePath = requiredAbsolutePath("STAR_RANS_TABLE_OUTPUT");
 
@@ -104,17 +104,12 @@ public class ExportRansTable extends StarMacro {
     simulation.println("STAR_BATCH_RANS_EXPORT_COMPLETE");
   }
 
-  private String requiredString(String environmentName) {
-    String value = System.getenv(environmentName);
-    if (value == null || value.trim().isEmpty()) {
-      throw new IllegalArgumentException(
-          "Required environment variable is not set: " + environmentName);
-    }
-    return value.trim();
-  }
-
+  // Deliberately not unified with ExportCcm's requiredAbsolutePath: that
+  // version adds an extra isAbsolute() check this one lacks. See the note
+  // atop MacroSupport.java.
   private String requiredAbsolutePath(String environmentName) {
-    File file = new File(requiredString(environmentName)).getAbsoluteFile();
+    File file = new File(MacroSupport.requiredString(environmentName))
+        .getAbsoluteFile();
     File parent = file.getParentFile();
     if (parent == null || !parent.isDirectory()) {
       throw new IllegalArgumentException(
