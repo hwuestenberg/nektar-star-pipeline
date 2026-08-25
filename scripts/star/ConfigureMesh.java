@@ -38,28 +38,28 @@ public class ConfigureMesh extends StarMacro {
   public void execute() {
     Simulation simulation = getActiveSimulation();
 
-    String operationName = MacroSupport.requiredString("STAR_MESH_OPERATION");
-    String wingControlName = MacroSupport.requiredString("STAR_WING_CONTROL");
-    String volumeControlName = MacroSupport.requiredString("STAR_VOLUME_CONTROL");
-    String volumePartName = MacroSupport.requiredString("STAR_VOLUME_PART");
-    double baseSize = MacroSupport.requiredDouble("STAR_BASE_SIZE_M");
-    double surfaceTarget = MacroSupport.requiredDouble("STAR_SURFACE_TARGET_PCT");
-    double surfaceMinimum = MacroSupport.requiredDouble("STAR_SURFACE_MIN_PCT");
-    double maximumCell = MacroSupport.requiredDouble("STAR_MAX_CELL_PCT");
-    double tetGrowth = MacroSupport.requiredDouble("STAR_TET_GROWTH_RATE");
-    double wingTarget = MacroSupport.requiredDouble("STAR_WING_TARGET_PCT");
-    double wingMinimum = MacroSupport.requiredDouble("STAR_WING_MIN_PCT");
-    double wingCurvature = MacroSupport.requiredDouble("STAR_WING_CURVATURE_POINTS");
-    double prismHeight = MacroSupport.requiredDouble("STAR_PRISM_HEIGHT_M");
-    int prismLayers = MacroSupport.requiredInteger("STAR_PRISM_LAYERS");
-    double prismStretching = MacroSupport.requiredDouble("STAR_PRISM_STRETCHING");
-    double volumeSize = MacroSupport.requiredDouble("STAR_VOLUME_SIZE_PCT");
-    double volumeXMin = MacroSupport.requiredDouble("STAR_VOLUME_X_MIN_M");
-    double volumeXMax = MacroSupport.requiredDouble("STAR_VOLUME_X_MAX_M");
-    double volumeYMin = MacroSupport.requiredDouble("STAR_VOLUME_Y_MIN_M");
-    double volumeYMax = MacroSupport.requiredDouble("STAR_VOLUME_Y_MAX_M");
-    double volumeZMin = MacroSupport.requiredDouble("STAR_VOLUME_Z_MIN_M");
-    double volumeZMax = MacroSupport.requiredDouble("STAR_VOLUME_Z_MAX_M");
+    String operationName = requiredString("STAR_MESH_OPERATION");
+    String wingControlName = requiredString("STAR_WING_CONTROL");
+    String volumeControlName = requiredString("STAR_VOLUME_CONTROL");
+    String volumePartName = requiredString("STAR_VOLUME_PART");
+    double baseSize = requiredDouble("STAR_BASE_SIZE_M");
+    double surfaceTarget = requiredDouble("STAR_SURFACE_TARGET_PCT");
+    double surfaceMinimum = requiredDouble("STAR_SURFACE_MIN_PCT");
+    double maximumCell = requiredDouble("STAR_MAX_CELL_PCT");
+    double tetGrowth = requiredDouble("STAR_TET_GROWTH_RATE");
+    double wingTarget = requiredDouble("STAR_WING_TARGET_PCT");
+    double wingMinimum = requiredDouble("STAR_WING_MIN_PCT");
+    double wingCurvature = requiredDouble("STAR_WING_CURVATURE_POINTS");
+    double prismHeight = requiredDouble("STAR_PRISM_HEIGHT_M");
+    int prismLayers = requiredInteger("STAR_PRISM_LAYERS");
+    double prismStretching = requiredDouble("STAR_PRISM_STRETCHING");
+    double volumeSize = requiredDouble("STAR_VOLUME_SIZE_PCT");
+    double volumeXMin = requiredDouble("STAR_VOLUME_X_MIN_M");
+    double volumeXMax = requiredDouble("STAR_VOLUME_X_MAX_M");
+    double volumeYMin = requiredDouble("STAR_VOLUME_Y_MIN_M");
+    double volumeYMax = requiredDouble("STAR_VOLUME_Y_MAX_M");
+    double volumeZMin = requiredDouble("STAR_VOLUME_Z_MIN_M");
+    double volumeZMax = requiredDouble("STAR_VOLUME_Z_MAX_M");
 
     AutoMeshOperation operation = (AutoMeshOperation) simulation
         .get(MeshOperationManager.class).getObject(operationName);
@@ -226,5 +226,36 @@ public class ConfigureMesh extends StarMacro {
     coordinate.setCoordinateSystem(coordinateSystem);
     coordinate.setCoordinate(
         units, units, units, new DoubleVector(new double[] {x, y, z}));
+  }
+
+  private String requiredString(String name) {
+    String value = System.getenv(name);
+    if (value == null || value.trim().isEmpty()) {
+      throw new IllegalArgumentException(
+          "Required environment variable is not set: " + name);
+    }
+    return value.trim();
+  }
+
+  private double requiredDouble(String name) {
+    String value = requiredString(name);
+    try {
+      return Double.parseDouble(value);
+    } catch (NumberFormatException error) {
+      throw new IllegalArgumentException(
+          "Environment variable is not a number: " + name + "=" + value,
+          error);
+    }
+  }
+
+  private int requiredInteger(String name) {
+    String value = requiredString(name);
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException error) {
+      throw new IllegalArgumentException(
+          "Environment variable is not an integer: " + name + "=" + value,
+          error);
+    }
   }
 }

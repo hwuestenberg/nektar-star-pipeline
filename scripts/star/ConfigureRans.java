@@ -62,34 +62,33 @@ public class ConfigureRans extends StarMacro {
   public void execute() {
     Simulation simulation = getActiveSimulation();
 
-    String regionName = MacroSupport.requiredString("STAR_RANS_REGION");
-    String continuumName = MacroSupport.requiredString("STAR_RANS_CONTINUUM");
-    String wingName = MacroSupport.requiredString("STAR_RANS_WING_BOUNDARY");
-    String upstreamName = MacroSupport.requiredString("STAR_RANS_UPSTREAM_BOUNDARY");
-    String downstreamName = MacroSupport.requiredString("STAR_RANS_DOWNSTREAM_BOUNDARY");
-    String topName = MacroSupport.requiredString("STAR_RANS_TOP_BOUNDARY");
-    String bottomName = MacroSupport.requiredString("STAR_RANS_BOTTOM_BOUNDARY");
-    String spanMinName = MacroSupport.requiredString("STAR_RANS_SPAN_MIN_BOUNDARY");
-    String spanMaxName = MacroSupport.requiredString("STAR_RANS_SPAN_MAX_BOUNDARY");
-    String spanMode = MacroSupport.requiredString("STAR_RANS_SPAN_MODE");
-    String periodicInterfaceName =
-        MacroSupport.requiredString("STAR_RANS_PERIODIC_INTERFACE");
-    String simulationOutput = MacroSupport.requiredString("STAR_RANS_SIM_OUTPUT");
+    String regionName = requiredString("STAR_RANS_REGION");
+    String continuumName = requiredString("STAR_RANS_CONTINUUM");
+    String wingName = requiredString("STAR_RANS_WING_BOUNDARY");
+    String upstreamName = requiredString("STAR_RANS_UPSTREAM_BOUNDARY");
+    String downstreamName = requiredString("STAR_RANS_DOWNSTREAM_BOUNDARY");
+    String topName = requiredString("STAR_RANS_TOP_BOUNDARY");
+    String bottomName = requiredString("STAR_RANS_BOTTOM_BOUNDARY");
+    String spanMinName = requiredString("STAR_RANS_SPAN_MIN_BOUNDARY");
+    String spanMaxName = requiredString("STAR_RANS_SPAN_MAX_BOUNDARY");
+    String spanMode = requiredString("STAR_RANS_SPAN_MODE");
+    String periodicInterfaceName = requiredString("STAR_RANS_PERIODIC_INTERFACE");
+    String simulationOutput = requiredString("STAR_RANS_SIM_OUTPUT");
 
-    double reynolds = MacroSupport.requiredDouble("STAR_RANS_REYNOLDS");
-    double angleDegrees = MacroSupport.requiredDouble("STAR_RANS_ANGLE_DEG");
+    double reynolds = requiredDouble("STAR_RANS_REYNOLDS");
+    double angleDegrees = requiredDouble("STAR_RANS_ANGLE_DEG");
     // STAR still attaches SI units to these quantities, but their numerical
     // values implement the same nondimensional convention used by Nektar++.
     // With chord=1, fixing U=1 and rho=1 leaves mu=nu=1/Re.
     double velocity = 1.0;
     double density = 1.0;
     double viscosity = 1.0 / reynolds;
-    double pressure = MacroSupport.requiredDouble("STAR_RANS_REFERENCE_PRESSURE");
-    double intensity = MacroSupport.requiredDouble("STAR_RANS_TURB_INTENSITY");
-    double viscosityRatio = MacroSupport.requiredDouble("STAR_RANS_TURB_VISC_RATIO");
-    int maximumSteps = MacroSupport.requiredInteger("STAR_RANS_MAX_STEPS");
-    int minimumSteps = MacroSupport.requiredInteger("STAR_RANS_MIN_STEPS");
-    double residualTolerance = MacroSupport.requiredDouble("STAR_RANS_RESIDUAL_TOL");
+    double pressure = requiredDouble("STAR_RANS_REFERENCE_PRESSURE");
+    double intensity = requiredDouble("STAR_RANS_TURB_INTENSITY");
+    double viscosityRatio = requiredDouble("STAR_RANS_TURB_VISC_RATIO");
+    int maximumSteps = requiredInteger("STAR_RANS_MAX_STEPS");
+    int minimumSteps = requiredInteger("STAR_RANS_MIN_STEPS");
+    double residualTolerance = requiredDouble("STAR_RANS_RESIDUAL_TOL");
 
     if (reynolds <= 0.0 || viscosity <= 0.0 || !Double.isFinite(viscosity)
         || intensity <= 0.0 || viscosityRatio <= 0.0 || maximumSteps <= 0
@@ -564,5 +563,36 @@ public class ConfigureRans extends StarMacro {
     boundary.getValues().get(TurbulentViscosityRatioProfile.class)
         .getMethod(ConstantScalarProfileMethod.class).getQuantity()
         .setValue(turbulentViscosityRatio);
+  }
+
+  private String requiredString(String name) {
+    String value = System.getenv(name);
+    if (value == null || value.trim().isEmpty()) {
+      throw new IllegalArgumentException(
+          "Required environment variable is not set: " + name);
+    }
+    return value.trim();
+  }
+
+  private double requiredDouble(String name) {
+    String value = requiredString(name);
+    try {
+      return Double.parseDouble(value);
+    } catch (NumberFormatException error) {
+      throw new IllegalArgumentException(
+          "Environment variable is not a number: " + name + "=" + value,
+          error);
+    }
+  }
+
+  private int requiredInteger(String name) {
+    String value = requiredString(name);
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException error) {
+      throw new IllegalArgumentException(
+          "Environment variable is not an integer: " + name + "=" + value,
+          error);
+    }
   }
 }

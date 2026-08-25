@@ -60,24 +60,23 @@ public class BootstrapCase extends StarMacro {
   @Override
   public void execute() {
     Simulation simulation = getActiveSimulation();
-    String stepFile = MacroSupport.requiredString("STAR_STEP_INPUT");
-    String outputSimulation = MacroSupport.requiredString("STAR_SIM_OUTPUT");
-    String partName = MacroSupport.optionalString(
-        "STAR_GEOMETRY_PART", "naca0012_domain");
-    String regionName = MacroSupport.optionalString("STAR_REGION", "Fluid");
-    String operationName = MacroSupport.optionalString(
+    String stepFile = requiredString("STAR_STEP_INPUT");
+    String outputSimulation = requiredString("STAR_SIM_OUTPUT");
+    String partName = optionalString("STAR_GEOMETRY_PART", "naca0012_domain");
+    String regionName = optionalString("STAR_REGION", "Fluid");
+    String operationName = optionalString(
         "STAR_MESH_OPERATION", "NACA0012_AutomatedMesh");
-    String wingControlName = MacroSupport.optionalString(
+    String wingControlName = optionalString(
         "STAR_WING_CONTROL", "WingSurfaceControl");
-    String farfieldControlName = MacroSupport.optionalString(
+    String farfieldControlName = optionalString(
         "STAR_FARFIELD_CONTROL", "NoPrismFarfieldControl");
-    String periodicInterfaceName = MacroSupport.optionalString(
+    String periodicInterfaceName = optionalString(
         "STAR_PERIODIC_INTERFACE", "SpanwisePeriodic");
     boolean periodicSpan = optionalBoolean("STAR_PERIODIC_SPAN", true);
     DoubleVector periodicTranslation = new DoubleVector(new double[] {
-        MacroSupport.optionalDouble("STAR_PERIODIC_TRANSLATION_X_M", 0.0),
-        MacroSupport.optionalDouble("STAR_PERIODIC_TRANSLATION_Y_M", 0.0),
-        MacroSupport.optionalDouble("STAR_PERIODIC_TRANSLATION_Z_M", 0.2)});
+        optionalDouble("STAR_PERIODIC_TRANSLATION_X_M", 0.0),
+        optionalDouble("STAR_PERIODIC_TRANSLATION_Y_M", 0.0),
+        optionalDouble("STAR_PERIODIC_TRANSLATION_Z_M", 0.2)});
 
     Collection<GeometryPart> existingParts = simulation
         .get(SimulationPartManager.class).getPartManager().getLeafParts();
@@ -524,6 +523,20 @@ public class BootstrapCase extends StarMacro {
     return result;
   }
 
+  private String requiredString(String name) {
+    String value = System.getenv(name);
+    if (value == null || value.trim().isEmpty()) {
+      throw new IllegalArgumentException(
+          "Required environment variable is not set: " + name);
+    }
+    return value.trim();
+  }
+
+  private String optionalString(String name, String fallback) {
+    String value = System.getenv(name);
+    return value == null || value.trim().isEmpty() ? fallback : value.trim();
+  }
+
   private boolean optionalBoolean(String name, boolean fallback) {
     String value = System.getenv(name);
     if (value == null || value.trim().isEmpty()) {
@@ -537,5 +550,19 @@ public class BootstrapCase extends StarMacro {
     }
     throw new IllegalArgumentException(
         "Environment variable must be true or false: " + name + "=" + value);
+  }
+
+  private double optionalDouble(String name, double fallback) {
+    String value = System.getenv(name);
+    if (value == null || value.trim().isEmpty()) {
+      return fallback;
+    }
+    try {
+      return Double.parseDouble(value.trim());
+    } catch (NumberFormatException error) {
+      throw new IllegalArgumentException(
+          "Environment variable must be numeric: " + name + "=" + value,
+          error);
+    }
   }
 }
