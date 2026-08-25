@@ -6,6 +6,8 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
 nektar_script_dir="$project_dir/scripts/nektar"
+# shellcheck source=scripts/workflow/lib/common.sh
+source "$script_dir/lib/common.sh"
 
 mesh_file=""
 session_file=""
@@ -65,47 +67,47 @@ EOF
 while (($#)); do
     case "$1" in
         --mesh)
-            [[ $# -ge 2 ]] || { echo "--mesh requires a value" >&2; exit 2; }
+            require_arg --mesh "$#"
             mesh_file="$2"
             shift 2
             ;;
         --session)
-            [[ $# -ge 2 ]] || { echo "--session requires a value" >&2; exit 2; }
+            require_arg --session "$#"
             session_file="$2"
             shift 2
             ;;
         --field)
-            [[ $# -ge 2 ]] || { echo "--field requires a value" >&2; exit 2; }
+            require_arg --field "$#"
             field_file="$2"
             shift 2
             ;;
         --output-dir)
-            [[ $# -ge 2 ]] || { echo "--output-dir requires a value" >&2; exit 2; }
+            require_arg --output-dir "$#"
             output_dir="$2"
             shift 2
             ;;
         --prefix)
-            [[ $# -ge 2 ]] || { echo "--prefix requires a value" >&2; exit 2; }
+            require_arg --prefix "$#"
             prefix="$2"
             shift 2
             ;;
         --boundary)
-            [[ $# -ge 2 ]] || { echo "--boundary requires a value" >&2; exit 2; }
+            require_arg --boundary "$#"
             boundary_id="$2"
             shift 2
             ;;
         --surface)
-            [[ $# -ge 2 ]] || { echo "--surface requires a value" >&2; exit 2; }
+            require_arg --surface "$#"
             surface_id="$2"
             shift 2
             ;;
         --reynolds)
-            [[ $# -ge 2 ]] || { echo "--reynolds requires a value" >&2; exit 2; }
+            require_arg --reynolds "$#"
             reynolds="$2"
             shift 2
             ;;
         --np)
-            [[ $# -ge 2 ]] || { echo "--np requires a value" >&2; exit 2; }
+            require_arg --np "$#"
             processes="$2"
             shift 2
             ;;
@@ -132,11 +134,7 @@ for required in mesh_file session_file field_file output_dir; do
     }
 done
 for path in "$mesh_file" "$session_file" "$field_file" "$output_dir"; do
-    [[ "$path" != /* && "$path" != *:* && "$path" != .. &&
-        "$path" != ../* && "$path" != */../* && "$path" != */.. ]] || {
-        echo "Paths must be repository-relative and colon-free: $path" >&2
-        exit 2
-    }
+    require_repo_relative_path "Paths must be repository-relative and colon-free" "$path"
 done
 [[ "$prefix" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
     echo "--prefix contains unsupported characters: $prefix" >&2

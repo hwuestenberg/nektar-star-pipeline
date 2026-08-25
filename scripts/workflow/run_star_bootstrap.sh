@@ -5,6 +5,8 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
+# shellcheck source=scripts/workflow/lib/common.sh
+source "$script_dir/lib/common.sh"
 
 step_file="cad/naca0012_domain.step"
 output_sim="star/naca0012_periodic_template.sim"
@@ -64,42 +66,27 @@ EOF
 while (($#)); do
     case "$1" in
         --step)
-            [[ $# -ge 2 ]] || {
-                echo "--step requires a value" >&2
-                exit 2
-            }
+            require_arg --step "$#"
             step_file="$2"
             shift 2
             ;;
         --output-sim)
-            [[ $# -ge 2 ]] || {
-                echo "--output-sim requires a value" >&2
-                exit 2
-            }
+            require_arg --output-sim "$#"
             output_sim="$2"
             shift 2
             ;;
         --log)
-            [[ $# -ge 2 ]] || {
-                echo "--log requires a value" >&2
-                exit 2
-            }
+            require_arg --log "$#"
             log_file="$2"
             shift 2
             ;;
         --provenance)
-            [[ $# -ge 2 ]] || {
-                echo "--provenance requires a value" >&2
-                exit 2
-            }
+            require_arg --provenance "$#"
             provenance_file="$2"
             shift 2
             ;;
         --np)
-            [[ $# -ge 2 ]] || {
-                echo "--np requires a value" >&2
-                exit 2
-            }
+            require_arg --np "$#"
             processes="$2"
             shift 2
             ;;
@@ -112,34 +99,22 @@ while (($#)); do
             shift
             ;;
         --periodic-translation-x)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-translation-x requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-translation-x "$#"
             periodic_translation_x_m="$2"
             shift 2
             ;;
         --periodic-translation-y)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-translation-y requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-translation-y "$#"
             periodic_translation_y_m="$2"
             shift 2
             ;;
         --periodic-translation-z)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-translation-z requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-translation-z "$#"
             periodic_translation_z_m="$2"
             shift 2
             ;;
         --star-executable)
-            [[ $# -ge 2 ]] || {
-                echo "--star-executable requires a value" >&2
-                exit 2
-            }
+            require_arg --star-executable "$#"
             star_executable="$2"
             shift 2
             ;;
@@ -172,26 +147,13 @@ while (($#)); do
     esac
 done
 
-absolute_path() {
-    if [[ "$1" == /* ]]; then
-        realpath -m -- "$1"
-    else
-        realpath -m -- "$project_dir/$1"
-    fi
-}
-
-step_file="$(absolute_path "$step_file")"
-output_sim="$(absolute_path "$output_sim")"
-log_file="$(absolute_path "$log_file")"
-provenance_file="$(absolute_path "$provenance_file")"
+step_file="$(absolute_path "$step_file" "$project_dir")"
+output_sim="$(absolute_path "$output_sim" "$project_dir")"
+log_file="$(absolute_path "$log_file" "$project_dir")"
+provenance_file="$(absolute_path "$provenance_file" "$project_dir")"
 macro_file="$project_dir/scripts/star/BootstrapCase.java"
 
-if [[ "$star_executable" == */* ]]; then
-    star_executable="$(absolute_path "$star_executable")"
-else
-    resolved_star_executable="$(command -v -- "$star_executable" || true)"
-    [[ -z "$resolved_star_executable" ]] || star_executable="$resolved_star_executable"
-fi
+resolve_star_executable star_executable "$project_dir"
 
 [[ -s "$step_file" ]] || {
     echo "STEP input is missing or empty: $step_file" >&2
@@ -205,15 +167,10 @@ fi
     echo "--np must be positive: $processes" >&2
     exit 2
 }
-for translation in \
+require_finite_components "Periodic translation components" \
     "$periodic_translation_x_m" \
     "$periodic_translation_y_m" \
-    "$periodic_translation_z_m"; do
-    awk -v value="$translation" 'BEGIN { exit !(value ~ /^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$/) }' || {
-        echo "Periodic translation components must be numeric: $translation" >&2
-        exit 2
-    }
-done
+    "$periodic_translation_z_m"
 
 if [[ "$force" != true ]]; then
     for output in "$output_sim" "$log_file" "$provenance_file"; do
@@ -224,24 +181,17 @@ if [[ "$force" != true ]]; then
     done
 fi
 
-if [[ "$dry_run" != true ]]; then
-    if { [[ "$star_executable" == */* ]] && [[ ! -x "$star_executable" ]]; } ||
-        { [[ "$star_executable" != */* ]] && ! command -v -- "$star_executable" >/dev/null 2>&1; }; then
-        echo "STAR executable is missing or not executable: $star_executable" >&2
-        exit 1
-    fi
-fi
+require_star_executable "$star_executable" "$dry_run"
 
+guard_pod_key_on_cli "${extra_star_args[@]}"
 license_mode=default
 pod_key=""
 if [[ "$power_on_demand" == true ]]; then
-    [[ -n "${STAR_POD_KEY:-}" ]] || {
-        echo "--power-on-demand requires STAR_POD_KEY." >&2
-        exit 2
-    }
-    license_mode=power-on-demand
+    guard_pod_power_flag_conflict "${extra_star_args[@]}"
+    require_pod_key
     pod_key="$STAR_POD_KEY"
     unset STAR_POD_KEY
+    license_mode=power-on-demand
     extra_star_args=(-power "${extra_star_args[@]}")
 fi
 
@@ -305,25 +255,24 @@ if ((star_status != 0)) || ! grep -q 'STAR_BATCH_BOOTSTRAP_COMPLETE' "$log_file"
     exit "$([[ $star_status -eq 0 ]] && printf 1 || printf '%s' "$star_status")"
 fi
 
-mv -f -- "$staged_sim" "$output_sim"
-rm -f -- "${staged_sim}~"
+publish_file "$staged_sim" "$output_sim"
 rmdir -- "$stage_dir" 2>/dev/null || true
 
 {
-    printf 'generated_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf 'star_executable=%s\n' "$star_executable"
-    printf 'license_mode=%s\n' "$license_mode"
-    printf 'processes=%s\n' "$processes"
-    printf 'step_file=%s\n' "$step_file"
-    printf 'step_sha256=%s\n' "$(sha256sum "$step_file" | awk '{print $1}')"
-    printf 'macro=%s\n' "$macro_file"
-    printf 'macro_sha256=%s\n' "$(sha256sum "$macro_file" | awk '{print $1}')"
-    printf 'periodic_span=%s\n' "$periodic_span"
-    printf 'periodic_translation_x_m=%s\n' "$periodic_translation_x_m"
-    printf 'periodic_translation_y_m=%s\n' "$periodic_translation_y_m"
-    printf 'periodic_translation_z_m=%s\n' "$periodic_translation_z_m"
-    printf 'output_sim=%s\n' "$output_sim"
-    printf 'output_sim_sha256=%s\n' "$(sha256sum "$output_sim" | awk '{print $1}')"
+    provenance_kv generated_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    provenance_kv star_executable "$star_executable"
+    provenance_kv license_mode "$license_mode"
+    provenance_kv processes "$processes"
+    provenance_kv step_file "$step_file"
+    provenance_sha256_field step "$step_file"
+    provenance_kv macro "$macro_file"
+    provenance_sha256_field macro "$macro_file"
+    provenance_kv periodic_span "$periodic_span"
+    provenance_kv periodic_translation_x_m "$periodic_translation_x_m"
+    provenance_kv periodic_translation_y_m "$periodic_translation_y_m"
+    provenance_kv periodic_translation_z_m "$periodic_translation_z_m"
+    provenance_kv output_sim "$output_sim"
+    provenance_sha256_field output_sim "$output_sim"
 } >"$provenance_file"
 
 echo "STAR bootstrap completed."

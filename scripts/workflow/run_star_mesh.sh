@@ -7,6 +7,8 @@ default_star_executable="${STAR_EXECUTABLE:-starccm+}"
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
+# shellcheck source=scripts/workflow/lib/common.sh
+source "$script_dir/lib/common.sh"
 
 template="star/naca0012_mesh_template.sim"
 output_sim="star/naca0012_meshed.sim"
@@ -112,234 +114,147 @@ EOF
 while (($#)); do
     case "$1" in
         --template)
-            [[ $# -ge 2 ]] || {
-                echo "--template requires a value" >&2
-                exit 2
-            }
+            require_arg --template "$#"
             template="$2"
             shift 2
             ;;
         --output-sim)
-            [[ $# -ge 2 ]] || {
-                echo "--output-sim requires a value" >&2
-                exit 2
-            }
+            require_arg --output-sim "$#"
             output_sim="$2"
             shift 2
             ;;
         --output-ccm)
-            [[ $# -ge 2 ]] || {
-                echo "--output-ccm requires a value" >&2
-                exit 2
-            }
+            require_arg --output-ccm "$#"
             output_ccm="$2"
             shift 2
             ;;
         --log)
-            [[ $# -ge 2 ]] || {
-                echo "--log requires a value" >&2
-                exit 2
-            }
+            require_arg --log "$#"
             log_file="$2"
             shift 2
             ;;
         --provenance)
-            [[ $# -ge 2 ]] || {
-                echo "--provenance requires a value" >&2
-                exit 2
-            }
+            require_arg --provenance "$#"
             provenance_file="$2"
             shift 2
             ;;
         --np)
-            [[ $# -ge 2 ]] || {
-                echo "--np requires a value" >&2
-                exit 2
-            }
+            require_arg --np "$#"
             processes="$2"
             shift 2
             ;;
         --mesh-operation)
-            [[ $# -ge 2 ]] || {
-                echo "--mesh-operation requires a value" >&2
-                exit 2
-            }
+            require_arg --mesh-operation "$#"
             mesh_operation="$2"
             shift 2
             ;;
         --wing-control)
-            [[ $# -ge 2 ]] || {
-                echo "--wing-control requires a value" >&2
-                exit 2
-            }
+            require_arg --wing-control "$#"
             wing_control="$2"
             shift 2
             ;;
         --volume-control)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-control requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-control "$#"
             volume_control="$2"
             shift 2
             ;;
         --volume-part)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-part requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-part "$#"
             volume_part="$2"
             shift 2
             ;;
         --base-size)
-            [[ $# -ge 2 ]] || {
-                echo "--base-size requires a value" >&2
-                exit 2
-            }
+            require_arg --base-size "$#"
             base_size_m="$2"
             shift 2
             ;;
         --surface-target-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--surface-target-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --surface-target-pct "$#"
             surface_target_pct="$2"
             shift 2
             ;;
         --surface-min-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--surface-min-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --surface-min-pct "$#"
             surface_min_pct="$2"
             shift 2
             ;;
         --max-cell-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--max-cell-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --max-cell-pct "$#"
             max_cell_pct="$2"
             shift 2
             ;;
         --tet-growth)
-            [[ $# -ge 2 ]] || {
-                echo "--tet-growth requires a value" >&2
-                exit 2
-            }
+            require_arg --tet-growth "$#"
             tet_growth_rate="$2"
             shift 2
             ;;
         --wing-target-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--wing-target-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --wing-target-pct "$#"
             wing_target_pct="$2"
             shift 2
             ;;
         --wing-min-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--wing-min-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --wing-min-pct "$#"
             wing_min_pct="$2"
             shift 2
             ;;
         --wing-curvature-points)
-            [[ $# -ge 2 ]] || {
-                echo "--wing-curvature-points requires a value" >&2
-                exit 2
-            }
+            require_arg --wing-curvature-points "$#"
             wing_curvature_points="$2"
             shift 2
             ;;
         --prism-height)
-            [[ $# -ge 2 ]] || {
-                echo "--prism-height requires a value" >&2
-                exit 2
-            }
+            require_arg --prism-height "$#"
             prism_height_m="$2"
             shift 2
             ;;
         --prism-layers)
-            [[ $# -ge 2 ]] || {
-                echo "--prism-layers requires a value" >&2
-                exit 2
-            }
+            require_arg --prism-layers "$#"
             prism_layers="$2"
             shift 2
             ;;
         --prism-stretching)
-            [[ $# -ge 2 ]] || {
-                echo "--prism-stretching requires a value" >&2
-                exit 2
-            }
+            require_arg --prism-stretching "$#"
             prism_stretching="$2"
             shift 2
             ;;
         --volume-size-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-size-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-size-pct "$#"
             volume_size_pct="$2"
             shift 2
             ;;
         --volume-x-min)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-x-min requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-x-min "$#"
             volume_x_min_m="$2"
             shift 2
             ;;
         --volume-x-max)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-x-max requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-x-max "$#"
             volume_x_max_m="$2"
             shift 2
             ;;
         --volume-y-min)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-y-min requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-y-min "$#"
             volume_y_min_m="$2"
             shift 2
             ;;
         --volume-y-max)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-y-max requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-y-max "$#"
             volume_y_max_m="$2"
             shift 2
             ;;
         --volume-z-min)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-z-min requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-z-min "$#"
             volume_z_min_m="$2"
             shift 2
             ;;
         --volume-z-max)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-z-max requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-z-max "$#"
             volume_z_max_m="$2"
             shift 2
             ;;
         --star-executable)
-            [[ $# -ge 2 ]] || {
-                echo "--star-executable requires a value" >&2
-                exit 2
-            }
+            require_arg --star-executable "$#"
             star_executable="$2"
             shift 2
             ;;
@@ -372,54 +287,25 @@ while (($#)); do
     esac
 done
 
-for star_arg in "${extra_star_args[@]}"; do
-    if [[ "$star_arg" == -podkey || "$star_arg" == -podkey=* ]]; then
-        echo "Do not pass a PoD key on the command line." >&2
-        echo "Use --power-on-demand with the STAR_POD_KEY environment variable." >&2
-        exit 2
-    fi
-done
+guard_pod_key_on_cli "${extra_star_args[@]}"
 
 license_mode="default"
 pod_key=""
 if [[ "$power_on_demand" == true ]]; then
-    if [[ -z "${STAR_POD_KEY:-}" ]]; then
-        echo "--power-on-demand requires the STAR_POD_KEY environment variable." >&2
-        exit 2
-    fi
-    for star_arg in "${extra_star_args[@]}"; do
-        if [[ "$star_arg" == -power || "$star_arg" == -powerpre ]]; then
-            echo "Do not combine --power-on-demand with $star_arg." >&2
-            exit 2
-        fi
-    done
-    license_mode="power-on-demand"
+    guard_pod_power_flag_conflict "${extra_star_args[@]}"
+    require_pod_key
     pod_key="$STAR_POD_KEY"
     unset STAR_POD_KEY
+    license_mode="power-on-demand"
     extra_star_args=(-power "${extra_star_args[@]}")
 fi
 
-absolute_path() {
-    if [[ "$1" == /* ]]; then
-        realpath -m -- "$1"
-    else
-        realpath -m -- "$project_dir/$1"
-    fi
-}
-
-template="$(absolute_path "$template")"
-output_sim="$(absolute_path "$output_sim")"
-output_ccm="$(absolute_path "$output_ccm")"
-log_file="$(absolute_path "$log_file")"
-provenance_file="$(absolute_path "$provenance_file")"
-if [[ "$star_executable" == */* ]]; then
-    star_executable="$(absolute_path "$star_executable")"
-else
-    resolved_star_executable="$(command -v -- "$star_executable" || true)"
-    if [[ -n "$resolved_star_executable" ]]; then
-        star_executable="$resolved_star_executable"
-    fi
-fi
+template="$(absolute_path "$template" "$project_dir")"
+output_sim="$(absolute_path "$output_sim" "$project_dir")"
+output_ccm="$(absolute_path "$output_ccm" "$project_dir")"
+log_file="$(absolute_path "$log_file" "$project_dir")"
+provenance_file="$(absolute_path "$provenance_file" "$project_dir")"
+resolve_star_executable star_executable "$project_dir"
 
 if [[ ! -f "$template" ]]; then
     echo "STAR template does not exist: $template" >&2
@@ -450,25 +336,6 @@ if [[ ! "$prism_layers" =~ ^[1-9][0-9]*$ ]]; then
     echo "--prism-layers must be a positive integer: $prism_layers" >&2
     exit 2
 fi
-
-validate_number() {
-    local option="$1"
-    local value="$2"
-    local predicate="$3"
-    if ! awk -v value="$value" "BEGIN { exit !($predicate) }"; then
-        echo "$option has an invalid value: $value" >&2
-        exit 2
-    fi
-}
-
-validate_real_number() {
-    local option="$1"
-    local value="$2"
-    if [[ ! "$value" =~ ^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$ ]]; then
-        echo "$option must be a finite number: $value" >&2
-        exit 2
-    fi
-}
 
 validate_number --base-size "$base_size_m" 'value > 0'
 validate_number --surface-target-pct "$surface_target_pct" 'value > 0'
@@ -673,11 +540,8 @@ if ! grep -q 'STAR_BATCH_MESH_CONFIGURED' "$log_file"; then
     exit 1
 fi
 
-mv -f -- "$staged_sim" "$output_sim"
-mv -f -- "$staged_ccm" "$output_ccm"
-# STAR may create a backup beside a simulation that was saved more than once.
-# It is private staging data, never a published pipeline result.
-rm -f -- "${staged_sim}~"
+publish_file "$staged_sim" "$output_sim"
+publish_file "$staged_ccm" "$output_ccm"
 if ! rmdir -- "$stage_dir" 2>/dev/null; then
     echo "STAR left auxiliary files in the staging directory: $stage_dir"
 fi
@@ -687,51 +551,51 @@ fi
 star_version="$(awk '/^Simcenter STAR-CCM\+/ {print; exit}' "$log_file")"
 star_version="${star_version:-unknown}"
 {
-    printf 'generated_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf 'host=%s\n' "$(hostname)"
-    printf 'star_executable=%s\n' "$star_executable"
-    printf 'star_version=%s\n' "${star_version//$'\n'/ }"
-    printf 'license_mode=%s\n' "$license_mode"
-    printf 'processes=%s\n' "$processes"
-    printf 'template=%s\n' "$template"
-    printf 'template_sha256=%s\n' "$(sha256sum "$template" | awk '{print $1}')"
-    printf 'macro=%s\n' "$macro_file"
-    printf 'macro_sha256=%s\n' "$(sha256sum "$macro_file" | awk '{print $1}')"
-    printf 'configure_macro=%s\n' "$configure_macro"
-    printf 'configure_macro_sha256=%s\n' "$(sha256sum "$configure_macro" | awk '{print $1}')"
-    printf 'mesh_operation=%s\n' "$mesh_operation"
-    printf 'wing_control=%s\n' "$wing_control"
-    printf 'volume_control=%s\n' "$volume_control"
-    printf 'volume_part=%s\n' "$volume_part"
-    printf 'base_size_m=%s\n' "$base_size_m"
-    printf 'surface_target_pct=%s\n' "$surface_target_pct"
-    printf 'surface_target_m=%s\n' "$surface_target_m"
-    printf 'surface_min_pct=%s\n' "$surface_min_pct"
-    printf 'surface_min_m=%s\n' "$surface_min_m"
-    printf 'max_cell_pct=%s\n' "$max_cell_pct"
-    printf 'tet_growth_rate=%s\n' "$tet_growth_rate"
-    printf 'wing_target_pct=%s\n' "$wing_target_pct"
-    printf 'wing_target_m=%s\n' "$wing_target_m"
-    printf 'wing_min_pct=%s\n' "$wing_min_pct"
-    printf 'wing_min_m=%s\n' "$wing_min_m"
-    printf 'wing_curvature_points=%s\n' "$wing_curvature_points"
-    printf 'volume_size_pct=%s\n' "$volume_size_pct"
-    printf 'volume_size_m=%s\n' "$volume_size_m"
-    printf 'volume_x_min_m=%s\n' "$volume_x_min_m"
-    printf 'volume_x_max_m=%s\n' "$volume_x_max_m"
-    printf 'volume_y_min_m=%s\n' "$volume_y_min_m"
-    printf 'volume_y_max_m=%s\n' "$volume_y_max_m"
-    printf 'volume_z_min_m=%s\n' "$volume_z_min_m"
-    printf 'volume_z_max_m=%s\n' "$volume_z_max_m"
-    printf 'prism_height_m=%s\n' "$prism_height_m"
-    printf 'prism_height_pct=%s\n' "$prism_height_pct"
-    printf 'prism_layers=%s\n' "$prism_layers"
-    printf 'prism_stretching=%s\n' "$prism_stretching"
-    printf 'output_sim=%s\n' "$output_sim"
-    printf 'output_sim_sha256=%s\n' "$(sha256sum "$output_sim" | awk '{print $1}')"
-    printf 'output_ccm=%s\n' "$output_ccm"
-    printf 'output_ccm_sha256=%s\n' "$(sha256sum "$output_ccm" | awk '{print $1}')"
-    printf 'batch_log=%s\n' "$log_file"
+    provenance_kv generated_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    provenance_kv host "$(hostname)"
+    provenance_kv star_executable "$star_executable"
+    provenance_kv star_version "${star_version//$'\n'/ }"
+    provenance_kv license_mode "$license_mode"
+    provenance_kv processes "$processes"
+    provenance_kv template "$template"
+    provenance_sha256_field template "$template"
+    provenance_kv macro "$macro_file"
+    provenance_sha256_field macro "$macro_file"
+    provenance_kv configure_macro "$configure_macro"
+    provenance_sha256_field configure_macro "$configure_macro"
+    provenance_kv mesh_operation "$mesh_operation"
+    provenance_kv wing_control "$wing_control"
+    provenance_kv volume_control "$volume_control"
+    provenance_kv volume_part "$volume_part"
+    provenance_kv base_size_m "$base_size_m"
+    provenance_kv surface_target_pct "$surface_target_pct"
+    provenance_kv surface_target_m "$surface_target_m"
+    provenance_kv surface_min_pct "$surface_min_pct"
+    provenance_kv surface_min_m "$surface_min_m"
+    provenance_kv max_cell_pct "$max_cell_pct"
+    provenance_kv tet_growth_rate "$tet_growth_rate"
+    provenance_kv wing_target_pct "$wing_target_pct"
+    provenance_kv wing_target_m "$wing_target_m"
+    provenance_kv wing_min_pct "$wing_min_pct"
+    provenance_kv wing_min_m "$wing_min_m"
+    provenance_kv wing_curvature_points "$wing_curvature_points"
+    provenance_kv volume_size_pct "$volume_size_pct"
+    provenance_kv volume_size_m "$volume_size_m"
+    provenance_kv volume_x_min_m "$volume_x_min_m"
+    provenance_kv volume_x_max_m "$volume_x_max_m"
+    provenance_kv volume_y_min_m "$volume_y_min_m"
+    provenance_kv volume_y_max_m "$volume_y_max_m"
+    provenance_kv volume_z_min_m "$volume_z_min_m"
+    provenance_kv volume_z_max_m "$volume_z_max_m"
+    provenance_kv prism_height_m "$prism_height_m"
+    provenance_kv prism_height_pct "$prism_height_pct"
+    provenance_kv prism_layers "$prism_layers"
+    provenance_kv prism_stretching "$prism_stretching"
+    provenance_kv output_sim "$output_sim"
+    provenance_sha256_field output_sim "$output_sim"
+    provenance_kv output_ccm "$output_ccm"
+    provenance_sha256_field output_ccm "$output_ccm"
+    provenance_kv batch_log "$log_file"
     printf 'batch_command='
     printf '%q ' "${command[@]}"
     printf '\n'

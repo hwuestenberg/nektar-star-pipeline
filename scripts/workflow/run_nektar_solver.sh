@@ -5,6 +5,8 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
+# shellcheck source=scripts/workflow/lib/common.sh
+source "$script_dir/lib/common.sh"
 case_config="${STAR_NEKTAR_CASE_CONFIG:-cases/naca0012-periodic/case.env}"
 if [[ "$case_config" != /* ]]; then
     case_config="$project_dir/$case_config"
@@ -61,66 +63,42 @@ EOF
 while (($#)); do
     case "$1" in
         --mesh)
-            [[ $# -ge 2 ]] || {
-                echo "--mesh requires a value" >&2
-                exit 2
-            }
+            require_arg --mesh "$#"
             mesh_file="$2"
             shift 2
             ;;
         --restart)
-            [[ $# -ge 2 ]] || {
-                echo "--restart requires a value" >&2
-                exit 2
-            }
+            require_arg --restart "$#"
             restart_file="$2"
             shift 2
             ;;
         --session)
-            [[ $# -ge 2 ]] || {
-                echo "--session requires a value" >&2
-                exit 2
-            }
+            require_arg --session "$#"
             session_file="$2"
             shift 2
             ;;
         --run-dir)
-            [[ $# -ge 2 ]] || {
-                echo "--run-dir requires a value" >&2
-                exit 2
-            }
+            require_arg --run-dir "$#"
             run_dir="$2"
             shift 2
             ;;
         --steps)
-            [[ $# -ge 2 ]] || {
-                echo "--steps requires a value" >&2
-                exit 2
-            }
+            require_arg --steps "$#"
             steps="$2"
             shift 2
             ;;
         --reynolds)
-            [[ $# -ge 2 ]] || {
-                echo "--reynolds requires a value" >&2
-                exit 2
-            }
+            require_arg --reynolds "$#"
             reynolds="$2"
             shift 2
             ;;
         --np)
-            [[ $# -ge 2 ]] || {
-                echo "--np requires a value" >&2
-                exit 2
-            }
+            require_arg --np "$#"
             processes="$2"
             shift 2
             ;;
         --wall-shear-np)
-            [[ $# -ge 2 ]] || {
-                echo "--wall-shear-np requires a value" >&2
-                exit 2
-            }
+            require_arg --wall-shear-np "$#"
             wall_shear_processes="$2"
             shift 2
             ;;
@@ -129,18 +107,12 @@ while (($#)); do
             shift
             ;;
         --wing-boundary)
-            [[ $# -ge 2 ]] || {
-                echo "--wing-boundary requires a value" >&2
-                exit 2
-            }
+            require_arg --wing-boundary "$#"
             wing_boundary="$2"
             shift 2
             ;;
         --wing-surface)
-            [[ $# -ge 2 ]] || {
-                echo "--wing-surface requires a value" >&2
-                exit 2
-            }
+            require_arg --wing-surface "$#"
             wing_surface="$2"
             shift 2
             ;;
@@ -162,20 +134,13 @@ done
 
 cd "$project_dir"
 for path in "$mesh_file" "$restart_file" "$session_file"; do
-    [[ "$path" != /* && "$path" != *:* && "$path" != ../* && "$path" != */../* ]] || {
-        echo "Input must be a repository-relative path: $path" >&2
-        exit 2
-    }
+    require_repo_relative_path "Input must be a repository-relative path" "$path"
     [[ -s "$path" ]] || {
         echo "Input is missing or empty: $path" >&2
         exit 1
     }
 done
-[[ "$run_dir" != /* && "$run_dir" != *:* && "$run_dir" != .. &&
-    "$run_dir" != ../* && "$run_dir" != */../* && "$run_dir" != */.. ]] || {
-    echo "--run-dir must stay inside the repository: $run_dir" >&2
-    exit 2
-}
+require_repo_relative_path "--run-dir must stay inside the repository" "$run_dir"
 [[ "$steps" =~ ^[1-9][0-9]*$ ]] || {
     echo "--steps must be a positive integer: $steps" >&2
     exit 2

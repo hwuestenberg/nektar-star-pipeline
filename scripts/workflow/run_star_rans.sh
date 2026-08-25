@@ -7,6 +7,8 @@ default_star_executable="${STAR_EXECUTABLE:-starccm+}"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
 nektar_script_dir="$project_dir/scripts/nektar"
+# shellcheck source=scripts/workflow/lib/common.sh
+source "$script_dir/lib/common.sh"
 
 input_sim="star/naca0012_meshed.sim"
 output_sim="star/naca0012_rans.sim"
@@ -272,24 +274,13 @@ while (($#)); do
     esac
 done
 
-absolute_path() {
-    if [[ "$1" == /* ]]; then realpath -m -- "$1"; else realpath -m -- "$project_dir/$1"; fi
-}
-
-input_sim="$(absolute_path "$input_sim")"
-output_sim="$(absolute_path "$output_sim")"
-raw_table="$(absolute_path "$raw_table")"
-output_csv="$(absolute_path "$output_csv")"
-log_file="$(absolute_path "$log_file")"
-provenance_file="$(absolute_path "$provenance_file")"
-if [[ "$star_executable" == */* ]]; then
-    star_executable="$(absolute_path "$star_executable")"
-else
-    resolved_star_executable="$(command -v -- "$star_executable" || true)"
-    if [[ -n "$resolved_star_executable" ]]; then
-        star_executable="$resolved_star_executable"
-    fi
-fi
+input_sim="$(absolute_path "$input_sim" "$project_dir")"
+output_sim="$(absolute_path "$output_sim" "$project_dir")"
+raw_table="$(absolute_path "$raw_table" "$project_dir")"
+output_csv="$(absolute_path "$output_csv" "$project_dir")"
+log_file="$(absolute_path "$log_file" "$project_dir")"
+provenance_file="$(absolute_path "$provenance_file" "$project_dir")"
+resolve_star_executable star_executable "$project_dir"
 
 [[ -s "$input_sim" ]] || {
     echo "Input STAR simulation is missing or empty: $input_sim" >&2
@@ -339,20 +330,6 @@ fi
     exit 2
 }
 
-validate_number() {
-    local option="$1" value="$2" predicate="$3"
-    if ! awk -v value="$value" "BEGIN { exit !($predicate) }"; then
-        echo "$option has an invalid value: $value" >&2
-        exit 2
-    fi
-}
-validate_real_number() {
-    local option="$1" value="$2"
-    if [[ ! "$value" =~ ^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$ ]]; then
-        echo "$option must be a finite number: $value" >&2
-        exit 2
-    fi
-}
 for numeric_pair in \
     "--reynolds:$reynolds" \
     "--angle-deg:$angle_deg" \
@@ -369,24 +346,15 @@ validate_number --turb-intensity "$turb_intensity" 'value > 0 && value < 1'
 validate_number --turb-visc-ratio "$turb_visc_ratio" 'value > 0'
 validate_number --residual-tol "$residual_tolerance" 'value > 0'
 
-for star_arg in "${extra_star_args[@]}"; do
-    if [[ "$star_arg" == -podkey || "$star_arg" == -podkey=* ]]; then
-        echo "Do not pass a PoD key on the command line; use STAR_POD_KEY." >&2
-        exit 2
-    fi
-    if [[ "$power_on_demand" == true && ("$star_arg" == -power || "$star_arg" == -powerpre) ]]; then
-        echo "Do not combine --power-on-demand with $star_arg." >&2
-        exit 2
-    fi
-done
+guard_pod_key_on_cli "${extra_star_args[@]}"
+if [[ "$power_on_demand" == true ]]; then
+    guard_pod_power_flag_conflict "${extra_star_args[@]}"
+fi
 
 license_mode=default
 pod_key=""
 if [[ "$power_on_demand" == true ]]; then
-    [[ -n "${STAR_POD_KEY:-}" ]] || {
-        echo "--power-on-demand requires STAR_POD_KEY." >&2
-        exit 2
-    }
+    require_pod_key
     pod_key="$STAR_POD_KEY"
     unset STAR_POD_KEY
     extra_star_args=(-power "${extra_star_args[@]}")
@@ -602,10 +570,9 @@ fi
     exit 1
 }
 
-mv -f -- "$staged_sim" "$output_sim"
-mv -f -- "$staged_raw" "$raw_table"
+publish_file "$staged_sim" "$output_sim"
+publish_file "$staged_raw" "$raw_table"
 mv -f -- "$staged_csv" "$output_csv"
-rm -f -- "${staged_sim}~"
 rmdir -- "$stage_dir" 2>/dev/null || true
 
 # The batch banner is authoritative and avoids an extra STAR launcher startup.
@@ -613,15 +580,15 @@ star_version="$(awk '/^Simcenter STAR-CCM\+/ {print; exit}' "$log_file")"
 star_version="${star_version:-unknown}"
 final_iteration="$(awk -F: '/STAR batch final iteration/ {gsub(/[[:space:]]/, "", $2); value=$2} END {print value}' "$log_file")"
 {
-    printf 'generated_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf 'host=%s\n' "$(hostname)"
-    printf 'star_version=%s\n' "${star_version//$'\n'/ }"
-    printf 'license_mode=%s\n' "$license_mode"
-    printf 'processes=%s\n' "$processes"
-    printf 'input_sim=%s\n' "$input_sim"
-    printf 'input_sim_sha256=%s\n' "$(sha256sum "$input_sim" | awk '{print $1}')"
-    printf 'configure_macro_sha256=%s\n' "$(sha256sum "$configure_macro" | awk '{print $1}')"
-    printf 'export_macro_sha256=%s\n' "$(sha256sum "$export_macro" | awk '{print $1}')"
+    provenance_kv generated_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    provenance_kv host "$(hostname)"
+    provenance_kv star_version "${star_version//$'\n'/ }"
+    provenance_kv license_mode "$license_mode"
+    provenance_kv processes "$processes"
+    provenance_kv input_sim "$input_sim"
+    provenance_sha256_field input_sim "$input_sim"
+    provenance_sha256_field configure_macro "$configure_macro"
+    provenance_sha256_field export_macro "$export_macro"
     printf 'nondimensional_velocity=%s\nangle_deg=%s\nnondimensional_density=%s\n' \
         "$velocity_mps" "$angle_deg" "$density_kgm3"
     printf 'reynolds=%s\nnondimensional_kinematic_viscosity=%s\nreference_pressure=%s\n' \
@@ -629,17 +596,17 @@ final_iteration="$(awk -F: '/STAR batch final iteration/ {gsub(/[[:space:]]/, ""
     printf 'turbulence_intensity=%s\nturbulent_viscosity_ratio=%s\n' "$turb_intensity" "$turb_visc_ratio"
     printf 'maximum_steps=%s\nminimum_steps=%s\nresidual_tolerance=%s\npressure_mode=%s\n' \
         "$max_steps" "$min_steps" "$residual_tolerance" "$pressure_mode"
-    printf 'final_iteration=%s\n' "${final_iteration:-unknown}"
-    printf 'residuals_converged=%s\n' "$residuals_converged"
-    printf 'allow_unconverged=%s\n' "$allow_unconverged"
-    printf 'velocity_only=%s\n' "$velocity_only"
-    printf 'single_session=%s\n' "$single_session"
+    provenance_kv final_iteration "${final_iteration:-unknown}"
+    provenance_kv residuals_converged "$residuals_converged"
+    provenance_kv allow_unconverged "$allow_unconverged"
+    provenance_kv velocity_only "$velocity_only"
+    provenance_kv single_session "$single_session"
     printf 'region=%s\ncontinuum=%s\n' "$region" "$continuum"
-    printf 'span_mode=%s\n' "$span_mode"
-    printf 'periodic_interface=%s\n' "$periodic_interface"
-    printf 'output_sim_sha256=%s\n' "$(sha256sum "$output_sim" | awk '{print $1}')"
-    printf 'raw_table_sha256=%s\n' "$(sha256sum "$raw_table" | awk '{print $1}')"
-    printf 'output_csv_sha256=%s\n' "$(sha256sum "$output_csv" | awk '{print $1}')"
+    provenance_kv span_mode "$span_mode"
+    provenance_kv periodic_interface "$periodic_interface"
+    provenance_sha256_field output_sim "$output_sim"
+    provenance_sha256_field raw_table "$raw_table"
+    provenance_sha256_field output_csv "$output_csv"
 } >"$provenance_file"
 
 echo "STAR RANS precursor completed."

@@ -5,6 +5,8 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
+# shellcheck source=scripts/workflow/lib/common.sh
+source "$script_dir/lib/common.sh"
 
 execute=false
 force=false
@@ -82,106 +84,67 @@ while (($#)); do
             shift
             ;;
         --star-np)
-            [[ $# -ge 2 ]] || {
-                echo "--star-np requires a value" >&2
-                exit 2
-            }
+            require_arg --star-np "$#"
             star_processes="$2"
             shift 2
             ;;
         --star-template)
-            [[ $# -ge 2 ]] || {
-                echo "--star-template requires a value" >&2
-                exit 2
-            }
+            require_arg --star-template "$#"
             star_template="$2"
             shift 2
             ;;
         --star-periodic-interface)
-            [[ $# -ge 2 ]] || {
-                echo "--star-periodic-interface requires a value" >&2
-                exit 2
-            }
+            require_arg --star-periodic-interface "$#"
             star_periodic_interface="$2"
             shift 2
             ;;
         --name-prefix)
-            [[ $# -ge 2 ]] || {
-                echo "--name-prefix requires a value" >&2
-                exit 2
-            }
+            require_arg --name-prefix "$#"
             name_prefix="$2"
             shift 2
             ;;
         --macro-height)
-            [[ $# -ge 2 ]] || {
-                echo "--macro-height requires a value" >&2
-                exit 2
-            }
+            require_arg --macro-height "$#"
             macro_height="$2"
             shift 2
             ;;
         --volume-size-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-size-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-size-pct "$#"
             volume_size_pct="$2"
             shift 2
             ;;
         --volume-x-min)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-x-min requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-x-min "$#"
             volume_x_min="$2"
             shift 2
             ;;
         --volume-x-max)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-x-max requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-x-max "$#"
             volume_x_max="$2"
             shift 2
             ;;
         --volume-y-min)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-y-min requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-y-min "$#"
             volume_y_min="$2"
             shift 2
             ;;
         --volume-y-max)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-y-max requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-y-max "$#"
             volume_y_max="$2"
             shift 2
             ;;
         --volume-z-min)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-z-min requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-z-min "$#"
             volume_z_min="$2"
             shift 2
             ;;
         --volume-z-max)
-            [[ $# -ge 2 ]] || {
-                echo "--volume-z-max requires a value" >&2
-                exit 2
-            }
+            require_arg --volume-z-max "$#"
             volume_z_max="$2"
             shift 2
             ;;
         --level)
-            [[ $# -ge 2 ]] || {
-                echo "--level requires a value" >&2
-                exit 2
-            }
+            require_arg --level "$#"
             selected_level="$2"
             shift 2
             ;;
@@ -213,14 +176,6 @@ if ! awk -v value="$volume_size_pct" 'BEGIN { exit !(value > 0) }'; then
     echo "--volume-size-pct must be positive: $volume_size_pct" >&2
     exit 2
 fi
-validate_real_number() {
-    local option="$1"
-    local value="$2"
-    if [[ ! "$value" =~ ^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$ ]]; then
-        echo "$option must be a finite number: $value" >&2
-        exit 2
-    fi
-}
 validate_real_number --volume-x-min "$volume_x_min"
 validate_real_number --volume-x-max "$volume_x_max"
 validate_real_number --volume-y-min "$volume_y_min"

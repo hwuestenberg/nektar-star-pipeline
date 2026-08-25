@@ -7,6 +7,8 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
 nektar_script_dir="$project_dir/scripts/nektar"
 source "$nektar_script_dir/container_images.sh"
+# shellcheck source=scripts/workflow/lib/common.sh
+source "$script_dir/lib/common.sh"
 
 force=false
 production=true
@@ -232,74 +234,47 @@ while (($#)); do
             shift
             ;;
         --star-np)
-            [[ $# -ge 2 ]] || {
-                echo "--star-np requires a value" >&2
-                exit 2
-            }
+            require_arg --star-np "$#"
             star_processes="$2"
             shift 2
             ;;
         --rans-np)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-np requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-np "$#"
             rans_processes="$2"
             shift 2
             ;;
         --star-executable)
-            [[ $# -ge 2 ]] || {
-                echo "--star-executable requires a value" >&2
-                exit 2
-            }
+            require_arg --star-executable "$#"
             star_executable="$2"
             shift 2
             ;;
         --star-template)
-            [[ $# -ge 2 ]] || {
-                echo "--star-template requires a value" >&2
-                exit 2
-            }
+            require_arg --star-template "$#"
             star_template="$2"
             shift 2
             ;;
         --star-step)
-            [[ $# -ge 2 ]] || {
-                echo "--star-step requires a value" >&2
-                exit 2
-            }
+            require_arg --star-step "$#"
             star_step="$2"
             shift 2
             ;;
         --star-mesh-operation)
-            [[ $# -ge 2 ]] || {
-                echo "--star-mesh-operation requires a value" >&2
-                exit 2
-            }
+            require_arg --star-mesh-operation "$#"
             star_mesh_operation="$2"
             shift 2
             ;;
         --star-wing-control)
-            [[ $# -ge 2 ]] || {
-                echo "--star-wing-control requires a value" >&2
-                exit 2
-            }
+            require_arg --star-wing-control "$#"
             star_wing_control="$2"
             shift 2
             ;;
         --star-volume-control)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-control requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-control "$#"
             star_volume_control="$2"
             shift 2
             ;;
         --star-volume-part)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-part requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-part "$#"
             star_volume_part="$2"
             shift 2
             ;;
@@ -308,74 +283,47 @@ while (($#)); do
             shift
             ;;
         --name)
-            [[ $# -ge 2 ]] || {
-                echo "--name requires a value" >&2
-                exit 2
-            }
+            require_arg --name "$#"
             case_name="$2"
             shift 2
             ;;
         --cad-file)
-            [[ $# -ge 2 ]] || {
-                echo "--cad-file requires a value" >&2
-                exit 2
-            }
+            require_arg --cad-file "$#"
             cad_file="$2"
             shift 2
             ;;
         --ccm-file)
-            [[ $# -ge 2 ]] || {
-                echo "--ccm-file requires a value" >&2
-                exit 2
-            }
+            require_arg --ccm-file "$#"
             ccm_file="$2"
             shift 2
             ;;
         --cad-order)
-            [[ $# -ge 2 ]] || {
-                echo "--cad-order requires a value" >&2
-                exit 2
-            }
+            require_arg --cad-order "$#"
             cad_order="$2"
             shift 2
             ;;
         --bl-surface)
-            [[ $# -ge 2 ]] || {
-                echo "--bl-surface requires a value" >&2
-                exit 2
-            }
+            require_arg --bl-surface "$#"
             bl_surface="$2"
             shift 2
             ;;
         --bl-layers)
-            [[ $# -ge 2 ]] || {
-                echo "--bl-layers requires a value" >&2
-                exit 2
-            }
+            require_arg --bl-layers "$#"
             bl_layers="$2"
             shift 2
             ;;
         --bl-ratio)
-            [[ $# -ge 2 ]] || {
-                echo "--bl-ratio requires a value" >&2
-                exit 2
-            }
+            require_arg --bl-ratio "$#"
             bl_ratio="$2"
             shift 2
             ;;
         --bl-nq)
-            [[ $# -ge 2 ]] || {
-                echo "--bl-nq requires a value" >&2
-                exit 2
-            }
+            require_arg --bl-nq "$#"
             bl_nq="$2"
             shift 2
             ;;
         --jac-threshold)
-            [[ $# -ge 2 ]] || {
-                echo "--jac-threshold requires a value" >&2
-                exit 2
-            }
+            require_arg --jac-threshold "$#"
             jac_threshold="$2"
             shift 2
             ;;
@@ -384,74 +332,47 @@ while (($#)); do
             shift
             ;;
         --periodic-surf1)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-surf1 requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-surf1 "$#"
             periodic_surf1="$2"
             shift 2
             ;;
         --periodic-surf2)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-surf2 requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-surf2 "$#"
             periodic_surf2="$2"
             shift 2
             ;;
         --periodic-dir)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-dir requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-dir "$#"
             periodic_dir="$2"
             shift 2
             ;;
         --periodic-translation-x)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-translation-x requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-translation-x "$#"
             periodic_translation_x="$2"
             shift 2
             ;;
         --periodic-translation-y)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-translation-y requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-translation-y "$#"
             periodic_translation_y="$2"
             shift 2
             ;;
         --periodic-translation-z)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-translation-z requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-translation-z "$#"
             periodic_translation_z="$2"
             shift 2
             ;;
         --periodic-tolfac)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-tolfac requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-tolfac "$#"
             periodic_tolfac="$2"
             shift 2
             ;;
         --periodic-abstol)
-            [[ $# -ge 2 ]] || {
-                echo "--periodic-abstol requires a value" >&2
-                exit 2
-            }
+            require_arg --periodic-abstol "$#"
             periodic_abstol="$2"
             shift 2
             ;;
         --star-periodic-interface)
-            [[ $# -ge 2 ]] || {
-                echo "--star-periodic-interface requires a value" >&2
-                exit 2
-            }
+            require_arg --star-periodic-interface "$#"
             star_periodic_interface="$2"
             shift 2
             ;;
@@ -460,66 +381,42 @@ while (($#)); do
             shift
             ;;
         --rans-reynolds)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-reynolds requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-reynolds "$#"
             rans_reynolds="$2"
             shift 2
             ;;
         --rans-angle-deg)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-angle-deg requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-angle-deg "$#"
             rans_angle_deg="$2"
             shift 2
             ;;
         --rans-pressure)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-pressure requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-pressure "$#"
             rans_pressure="$2"
             shift 2
             ;;
         --rans-turb-intensity)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-turb-intensity requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-turb-intensity "$#"
             rans_turb_intensity="$2"
             shift 2
             ;;
         --rans-turb-visc-ratio)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-turb-visc-ratio requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-turb-visc-ratio "$#"
             rans_turb_visc_ratio="$2"
             shift 2
             ;;
         --rans-max-steps)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-max-steps requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-max-steps "$#"
             rans_max_steps="$2"
             shift 2
             ;;
         --rans-min-steps)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-min-steps requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-min-steps "$#"
             rans_min_steps="$2"
             shift 2
             ;;
         --rans-residual-tol)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-residual-tol requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-residual-tol "$#"
             rans_residual_tolerance="$2"
             shift 2
             ;;
@@ -528,171 +425,108 @@ while (($#)); do
             shift
             ;;
         --rans-pressure-mode)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-pressure-mode requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-pressure-mode "$#"
             rans_pressure_mode="$2"
             shift 2
             ;;
         --rans-session)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-session requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-session "$#"
             rans_session="$2"
             run_rans=true
             shift 2
             ;;
         --rans-num-modes)
-            [[ $# -ge 2 ]] || {
-                echo "--rans-num-modes requires a value" >&2
-                exit 2
-            }
+            require_arg --rans-num-modes "$#"
             rans_num_modes="$2"
             shift 2
             ;;
         --star-base-size)
-            [[ $# -ge 2 ]] || {
-                echo "--star-base-size requires a value" >&2
-                exit 2
-            }
+            require_arg --star-base-size "$#"
             star_base_size="$2"
             shift 2
             ;;
         --star-surface-target-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--star-surface-target-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --star-surface-target-pct "$#"
             star_surface_target_pct="$2"
             shift 2
             ;;
         --star-surface-min-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--star-surface-min-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --star-surface-min-pct "$#"
             star_surface_min_pct="$2"
             shift 2
             ;;
         --star-max-cell-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--star-max-cell-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --star-max-cell-pct "$#"
             star_max_cell_pct="$2"
             shift 2
             ;;
         --star-tet-growth)
-            [[ $# -ge 2 ]] || {
-                echo "--star-tet-growth requires a value" >&2
-                exit 2
-            }
+            require_arg --star-tet-growth "$#"
             star_tet_growth="$2"
             shift 2
             ;;
         --star-wing-target-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--star-wing-target-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --star-wing-target-pct "$#"
             star_wing_target_pct="$2"
             shift 2
             ;;
         --star-wing-min-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--star-wing-min-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --star-wing-min-pct "$#"
             star_wing_min_pct="$2"
             shift 2
             ;;
         --star-wing-curvature)
-            [[ $# -ge 2 ]] || {
-                echo "--star-wing-curvature requires a value" >&2
-                exit 2
-            }
+            require_arg --star-wing-curvature "$#"
             star_wing_curvature_points="$2"
             shift 2
             ;;
         --star-prism-height)
-            [[ $# -ge 2 ]] || {
-                echo "--star-prism-height requires a value" >&2
-                exit 2
-            }
+            require_arg --star-prism-height "$#"
             star_prism_height="$2"
             shift 2
             ;;
         --star-prism-layers)
-            [[ $# -ge 2 ]] || {
-                echo "--star-prism-layers requires a value" >&2
-                exit 2
-            }
+            require_arg --star-prism-layers "$#"
             star_prism_layers="$2"
             shift 2
             ;;
         --star-prism-stretching)
-            [[ $# -ge 2 ]] || {
-                echo "--star-prism-stretching requires a value" >&2
-                exit 2
-            }
+            require_arg --star-prism-stretching "$#"
             star_prism_stretching="$2"
             shift 2
             ;;
         --star-volume-size-pct)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-size-pct requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-size-pct "$#"
             star_volume_size_pct="$2"
             shift 2
             ;;
         --star-volume-x-min)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-x-min requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-x-min "$#"
             star_volume_x_min="$2"
             shift 2
             ;;
         --star-volume-x-max)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-x-max requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-x-max "$#"
             star_volume_x_max="$2"
             shift 2
             ;;
         --star-volume-y-min)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-y-min requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-y-min "$#"
             star_volume_y_min="$2"
             shift 2
             ;;
         --star-volume-y-max)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-y-max requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-y-max "$#"
             star_volume_y_max="$2"
             shift 2
             ;;
         --star-volume-z-min)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-z-min requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-z-min "$#"
             star_volume_z_min="$2"
             shift 2
             ;;
         --star-volume-z-max)
-            [[ $# -ge 2 ]] || {
-                echo "--star-volume-z-max requires a value" >&2
-                exit 2
-            }
+            require_arg --star-volume-z-max "$#"
             star_volume_z_max="$2"
             shift 2
             ;;
@@ -750,15 +584,10 @@ if [[ ! "$periodic_dir" =~ ^(x|y|z)$ ]]; then
     echo "--periodic-dir must be x, y or z: $periodic_dir" >&2
     exit 2
 fi
-for translation in \
+require_finite_components "Periodic translation components" \
     "$periodic_translation_x" \
     "$periodic_translation_y" \
-    "$periodic_translation_z"; do
-    awk -v value="$translation" 'BEGIN { exit !(value ~ /^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$/) }' || {
-        echo "Periodic translation components must be numeric: $translation" >&2
-        exit 2
-    }
-done
+    "$periodic_translation_z"
 if [[ ! "$bl_layers" =~ ^[1-9][0-9]*$ ]]; then
     echo "--bl-layers must be a positive integer: $bl_layers" >&2
     exit 2
@@ -801,15 +630,6 @@ if ((bl_nq < cad_order + 1)); then
     exit 2
 fi
 
-validate_positive_number() {
-    local option="$1"
-    local value="$2"
-    if ! awk -v value="$value" 'BEGIN { exit !(value > 0) }'; then
-        echo "$option must be positive: $value" >&2
-        exit 2
-    fi
-}
-
 validate_positive_number --bl-ratio "$bl_ratio"
 validate_positive_number --jac-threshold "$jac_threshold"
 validate_positive_number --star-base-size "$star_base_size"
@@ -827,15 +647,6 @@ validate_positive_number --rans-turb-intensity "$rans_turb_intensity"
 validate_positive_number --rans-turb-visc-ratio "$rans_turb_visc_ratio"
 validate_positive_number --rans-residual-tol "$rans_residual_tolerance"
 validate_positive_number --periodic-tolfac "$periodic_tolfac"
-
-validate_real_number() {
-    local option="$1"
-    local value="$2"
-    if [[ ! "$value" =~ ^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][-+]?[0-9]+)?$ ]]; then
-        echo "$option must be a finite number: $value" >&2
-        exit 2
-    fi
-}
 
 validate_real_number --star-volume-x-min "$star_volume_x_min"
 validate_real_number --star-volume-x-max "$star_volume_x_max"
@@ -918,14 +729,12 @@ fi
 cd "$project_dir"
 mkdir -p nekmesh logs
 
-if [[ "$cad_file" == /* || "$cad_file" == *:* ]]; then
-    echo "--cad-file must be a colon-free path relative to the tutorial root." >&2
-    exit 2
-fi
-if [[ -n "$ccm_file" && ("$ccm_file" == /* || "$ccm_file" == *:*) ]]; then
-    echo "--ccm-file must be a colon-free path relative to the tutorial root." >&2
-    exit 2
-fi
+require_repo_relative_path \
+    "--cad-file must be a colon-free path relative to the tutorial root" \
+    "$cad_file"
+require_repo_relative_path \
+    "--ccm-file must be a colon-free path relative to the tutorial root" \
+    "$ccm_file"
 if [[ ! -s "$cad_file" ]]; then
     echo "CAD file is missing or empty: $cad_file" >&2
     exit 1
@@ -935,10 +744,9 @@ if [[ "$rans_session" == auto ]]; then
     rans_session="nekmesh/${case_name}_restart_session.xml"
 fi
 if [[ -n "$rans_session" ]]; then
-    if [[ "$rans_session" == /* || "$rans_session" == *:* ]]; then
-        echo "--rans-session must be a colon-free path relative to the tutorial root." >&2
-        exit 2
-    fi
+    require_repo_relative_path \
+        "--rans-session must be a colon-free path relative to the tutorial root" \
+        "$rans_session"
     if [[ "$rans_session_auto" != true && ! -s "$rans_session" ]]; then
         echo "RANS target session is missing or empty: $rans_session" >&2
         exit 1
@@ -1122,23 +930,6 @@ if [[ "$force" == true ]]; then
     force_arg=(-f)
     star_force_arg=(--force)
 fi
-
-run_stage() {
-    local label="$1"
-    local log="$2"
-    shift 2
-
-    printf '[pipeline] %s\n' "$label"
-    if "$@" >"$log" 2>&1; then
-        printf '[pipeline] completed: %s (log: %s)\n' "$label" "$log"
-    else
-        local status=$?
-        printf '[pipeline] failed: %s, status %s (log: %s)\n' \
-            "$label" "$status" "$log" >&2
-        tail -n 50 -- "$log" >&2 || true
-        return "$status"
-    fi
-}
 
 run_star_stage() {
     local star_args=(
@@ -1558,86 +1349,86 @@ fi
 
 provenance="logs/${case_name}_pipeline.provenance.txt"
 {
-    printf 'started_utc=%s\n' "$started_utc"
-    printf 'completed_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf 'host=%s\n' "$(hostname)"
-    printf 'star_skipped=%s\n' "$skip_star"
-    printf 'production_mode=%s\n' "$production"
-    printf 'star_parameters_applied=%s\n' "$([[ "$skip_star" == true ]] && printf false || printf true)"
-    printf 'star_license_mode=%s\n' "$([[ "$power_on_demand" == true ]] && printf power-on-demand || printf default)"
-    printf 'star_processes=%s\n' "$star_processes"
-    printf 'rans_processes=%s\n' "$rans_processes"
-    printf 'star_template=%s\n' "$star_template"
-    printf 'star_step=%s\n' "$star_step"
-    printf 'star_mesh_operation=%s\n' "$star_mesh_operation"
-    printf 'star_wing_control=%s\n' "$star_wing_control"
-    printf 'star_volume_control=%s\n' "$star_volume_control"
-    printf 'star_volume_part=%s\n' "$star_volume_part"
-    printf 'case_name=%s\n' "$case_name"
-    printf 'cad_file=%s\n' "$cad_file"
-    printf 'ccm_file=%s\n' "$ccm_file"
-    printf 'cad_order=%s\n' "$cad_order"
-    printf 'bl_surface=%s\n' "$bl_surface"
-    printf 'bl_layers=%s\n' "$bl_layers"
-    printf 'bl_ratio=%s\n' "$bl_ratio"
-    printf 'bl_nq=%s\n' "$bl_nq"
-    printf 'jac_threshold=%s\n' "$jac_threshold"
-    printf 'periodic_span=%s\n' "$periodic_span"
-    printf 'periodic_surf1=%s\n' "$periodic_surf1"
-    printf 'periodic_surf2=%s\n' "$periodic_surf2"
-    printf 'periodic_direction=%s\n' "$periodic_dir"
-    printf 'periodic_translation_x_m=%s\n' "$periodic_translation_x"
-    printf 'periodic_translation_y_m=%s\n' "$periodic_translation_y"
-    printf 'periodic_translation_z_m=%s\n' "$periodic_translation_z"
-    printf 'periodic_tolfac=%s\n' "$periodic_tolfac"
-    printf 'periodic_abstol=%s\n' "$periodic_abstol"
-    printf 'star_periodic_interface=%s\n' "$star_periodic_interface"
-    printf 'rans_enabled=%s\n' "$run_rans"
-    printf 'rans_nondimensional_velocity=%s\n' "1.0"
-    printf 'rans_angle_deg=%s\n' "$rans_angle_deg"
-    printf 'rans_nondimensional_density=%s\n' "1.0"
-    printf 'rans_reynolds=%s\n' "$rans_reynolds"
-    printf 'rans_nondimensional_kinematic_viscosity=%s\n' \
+    provenance_kv started_utc "$started_utc"
+    provenance_kv completed_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    provenance_kv host "$(hostname)"
+    provenance_kv star_skipped "$skip_star"
+    provenance_kv production_mode "$production"
+    provenance_kv star_parameters_applied "$([[ "$skip_star" == true ]] && printf false || printf true)"
+    provenance_kv star_license_mode "$([[ "$power_on_demand" == true ]] && printf power-on-demand || printf default)"
+    provenance_kv star_processes "$star_processes"
+    provenance_kv rans_processes "$rans_processes"
+    provenance_kv star_template "$star_template"
+    provenance_kv star_step "$star_step"
+    provenance_kv star_mesh_operation "$star_mesh_operation"
+    provenance_kv star_wing_control "$star_wing_control"
+    provenance_kv star_volume_control "$star_volume_control"
+    provenance_kv star_volume_part "$star_volume_part"
+    provenance_kv case_name "$case_name"
+    provenance_kv cad_file "$cad_file"
+    provenance_kv ccm_file "$ccm_file"
+    provenance_kv cad_order "$cad_order"
+    provenance_kv bl_surface "$bl_surface"
+    provenance_kv bl_layers "$bl_layers"
+    provenance_kv bl_ratio "$bl_ratio"
+    provenance_kv bl_nq "$bl_nq"
+    provenance_kv jac_threshold "$jac_threshold"
+    provenance_kv periodic_span "$periodic_span"
+    provenance_kv periodic_surf1 "$periodic_surf1"
+    provenance_kv periodic_surf2 "$periodic_surf2"
+    provenance_kv periodic_direction "$periodic_dir"
+    provenance_kv periodic_translation_x_m "$periodic_translation_x"
+    provenance_kv periodic_translation_y_m "$periodic_translation_y"
+    provenance_kv periodic_translation_z_m "$periodic_translation_z"
+    provenance_kv periodic_tolfac "$periodic_tolfac"
+    provenance_kv periodic_abstol "$periodic_abstol"
+    provenance_kv star_periodic_interface "$star_periodic_interface"
+    provenance_kv rans_enabled "$run_rans"
+    provenance_kv rans_nondimensional_velocity "1.0"
+    provenance_kv rans_angle_deg "$rans_angle_deg"
+    provenance_kv rans_nondimensional_density "1.0"
+    provenance_kv rans_reynolds "$rans_reynolds"
+    provenance_kv rans_nondimensional_kinematic_viscosity \
         "$(awk -v re="$rans_reynolds" 'BEGIN { printf "%.17g", 1.0/re }')"
-    printf 'rans_reference_pressure=%s\n' "$rans_pressure"
-    printf 'rans_turbulence_intensity=%s\n' "$rans_turb_intensity"
-    printf 'rans_turbulent_viscosity_ratio=%s\n' "$rans_turb_visc_ratio"
-    printf 'rans_maximum_steps=%s\n' "$rans_max_steps"
-    printf 'rans_minimum_steps=%s\n' "$rans_min_steps"
-    printf 'rans_residual_tolerance=%s\n' "$rans_residual_tolerance"
-    printf 'rans_allow_unconverged=%s\n' "$rans_allow_unconverged"
-    printf 'rans_pressure_mode=%s\n' "$rans_pressure_mode"
-    printf 'rans_session=%s\n' "$rans_session"
-    printf 'rans_session_auto=%s\n' "$rans_session_auto"
-    printf 'rans_num_modes=%s\n' "$rans_num_modes"
-    printf 'star_base_size_m=%s\n' "$star_base_size"
-    printf 'star_surface_target_pct=%s\n' "$star_surface_target_pct"
-    printf 'star_surface_min_pct=%s\n' "$star_surface_min_pct"
-    printf 'star_max_cell_pct=%s\n' "$star_max_cell_pct"
-    printf 'star_tet_growth_rate=%s\n' "$star_tet_growth"
-    printf 'star_wing_target_pct=%s\n' "$star_wing_target_pct"
-    printf 'star_wing_min_pct=%s\n' "$star_wing_min_pct"
-    printf 'star_wing_curvature_points=%s\n' "$star_wing_curvature_points"
-    printf 'star_volume_size_pct=%s\n' "$star_volume_size_pct"
-    printf 'star_volume_size_m=%s\n' "$volume_size_m"
-    printf 'star_volume_x_min_m=%s\n' "$star_volume_x_min"
-    printf 'star_volume_x_max_m=%s\n' "$star_volume_x_max"
-    printf 'star_volume_y_min_m=%s\n' "$star_volume_y_min"
-    printf 'star_volume_y_max_m=%s\n' "$star_volume_y_max"
-    printf 'star_volume_z_min_m=%s\n' "$star_volume_z_min"
-    printf 'star_volume_z_max_m=%s\n' "$star_volume_z_max"
-    printf 'star_prism_height_m=%s\n' "$star_prism_height"
-    printf 'star_prism_layers=%s\n' "$star_prism_layers"
-    printf 'star_prism_stretching=%s\n' "$star_prism_stretching"
-    printf 'derived_global_target_m=%s\n' "$global_target_m"
-    printf 'derived_global_min_m=%s\n' "$global_min_m"
-    printf 'derived_wing_target_m=%s\n' "$wing_target_m"
-    printf 'derived_wing_min_m=%s\n' "$wing_min_m"
-    printf 'derived_volume_size_m=%s\n' "$volume_size_m"
-    printf 'derived_first_split_height_m=%s\n' "$first_split_height_m"
-    printf 'container_runtime_request=%s\n' "${NEKTAR_CONTAINER_RUNTIME:-auto}"
-    printf 'nektar_release=%s\n' "$NEKTAR_RELEASE_DEFAULT"
-    printf 'nektar_image=%s\n' "${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}"
+    provenance_kv rans_reference_pressure "$rans_pressure"
+    provenance_kv rans_turbulence_intensity "$rans_turb_intensity"
+    provenance_kv rans_turbulent_viscosity_ratio "$rans_turb_visc_ratio"
+    provenance_kv rans_maximum_steps "$rans_max_steps"
+    provenance_kv rans_minimum_steps "$rans_min_steps"
+    provenance_kv rans_residual_tolerance "$rans_residual_tolerance"
+    provenance_kv rans_allow_unconverged "$rans_allow_unconverged"
+    provenance_kv rans_pressure_mode "$rans_pressure_mode"
+    provenance_kv rans_session "$rans_session"
+    provenance_kv rans_session_auto "$rans_session_auto"
+    provenance_kv rans_num_modes "$rans_num_modes"
+    provenance_kv star_base_size_m "$star_base_size"
+    provenance_kv star_surface_target_pct "$star_surface_target_pct"
+    provenance_kv star_surface_min_pct "$star_surface_min_pct"
+    provenance_kv star_max_cell_pct "$star_max_cell_pct"
+    provenance_kv star_tet_growth_rate "$star_tet_growth"
+    provenance_kv star_wing_target_pct "$star_wing_target_pct"
+    provenance_kv star_wing_min_pct "$star_wing_min_pct"
+    provenance_kv star_wing_curvature_points "$star_wing_curvature_points"
+    provenance_kv star_volume_size_pct "$star_volume_size_pct"
+    provenance_kv star_volume_size_m "$volume_size_m"
+    provenance_kv star_volume_x_min_m "$star_volume_x_min"
+    provenance_kv star_volume_x_max_m "$star_volume_x_max"
+    provenance_kv star_volume_y_min_m "$star_volume_y_min"
+    provenance_kv star_volume_y_max_m "$star_volume_y_max"
+    provenance_kv star_volume_z_min_m "$star_volume_z_min"
+    provenance_kv star_volume_z_max_m "$star_volume_z_max"
+    provenance_kv star_prism_height_m "$star_prism_height"
+    provenance_kv star_prism_layers "$star_prism_layers"
+    provenance_kv star_prism_stretching "$star_prism_stretching"
+    provenance_kv derived_global_target_m "$global_target_m"
+    provenance_kv derived_global_min_m "$global_min_m"
+    provenance_kv derived_wing_target_m "$wing_target_m"
+    provenance_kv derived_wing_min_m "$wing_min_m"
+    provenance_kv derived_volume_size_m "$volume_size_m"
+    provenance_kv derived_first_split_height_m "$first_split_height_m"
+    provenance_kv container_runtime_request "${NEKTAR_CONTAINER_RUNTIME:-auto}"
+    provenance_kv nektar_release "$NEKTAR_RELEASE_DEFAULT"
+    provenance_kv nektar_image "${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}"
     provenance_outputs=(
         "$cad_file"
         "$ccm_file"
@@ -1654,24 +1445,23 @@ provenance="logs/${case_name}_pipeline.provenance.txt"
         )
     fi
     for output in "${provenance_outputs[@]}"; do
-        printf 'sha256[%s]=%s\n' "$output" "$(sha256sum "$output" | awk '{print $1}')"
+        provenance_sha256 "$output" "$output"
     done
     if [[ "$run_rans" == true ]]; then
         for output in \
             "star/${case_name}_rans.sim" \
             "star/${case_name}_rans_raw.csv" \
             "star/${case_name}_rans_nektar.csv"; do
-            printf 'sha256[%s]=%s\n' "$output" "$(sha256sum "$output" | awk '{print $1}')"
+            provenance_sha256 "$output" "$output"
         done
     fi
     if [[ "$periodic_span" == true && "$production" != true ]]; then
-        printf 'sha256[%s]=%s\n' "nekmesh/${periodic_stem}.xml" \
-            "$(sha256sum "nekmesh/${periodic_stem}.xml" | awk '{print $1}')"
+        provenance_sha256 "nekmesh/${periodic_stem}.xml" "nekmesh/${periodic_stem}.xml"
     fi
     if [[ -n "$rans_session" ]]; then
-        printf 'sha256[%s]=%s\n' "$rans_session" "$(sha256sum "$rans_session" | awk '{print $1}')"
-        printf 'sha256[%s]=%s\n' "nekmesh/${case_name}_rans_initial.fld" \
-            "$(sha256sum "nekmesh/${case_name}_rans_initial.fld" | awk '{print $1}')"
+        provenance_sha256 "$rans_session" "$rans_session"
+        provenance_sha256 "nekmesh/${case_name}_rans_initial.fld" \
+            "nekmesh/${case_name}_rans_initial.fld"
     fi
 } >"$provenance"
 
