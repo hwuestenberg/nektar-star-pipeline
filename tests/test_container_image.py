@@ -20,13 +20,19 @@ def test_all_nektar_wrappers_use_one_full_image():
         "2ae26f90b902742b7b2a7e6c9a18542b171e654a26f54b9944ab636d24da3748"
     )
 
+    # The three wrappers share one dispatch helper instead of each resolving
+    # the image independently; check the resolution lives there once and
+    # that every wrapper actually sources it.
+    shared_helper = (NEKTAR_SCRIPTS / "run_nektar_tool.sh").read_text()
+    assert '${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}' in shared_helper
+
     for name in (
         "nekmesh_docker.sh",
         "fieldconvert_docker.sh",
         "incnavierstokes_docker.sh",
     ):
         wrapper = (NEKTAR_SCRIPTS / name).read_text()
-        assert '${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}' in wrapper
+        assert "run_nektar_tool.sh" in wrapper
 
 
 def test_component_specific_image_configuration_was_removed():
@@ -36,6 +42,7 @@ def test_component_specific_image_configuration_was_removed():
         ROOT / "scripts" / "workflow" / "run_remote_pipeline.sh",
         *(NEKTAR_SCRIPTS / name for name in (
             "container_images.sh",
+            "run_nektar_tool.sh",
             "nekmesh_docker.sh",
             "fieldconvert_docker.sh",
             "incnavierstokes_docker.sh",

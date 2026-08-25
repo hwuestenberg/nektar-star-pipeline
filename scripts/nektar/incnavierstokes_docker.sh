@@ -6,11 +6,10 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
 source "$script_dir/container_images.sh"
+source "$script_dir/run_nektar_tool.sh"
 
-nektar_image="${NEKTAR_CONTAINER_IMAGE:-$NEKTAR_IMAGE_DEFAULT}"
 solver_executable="${NEKTAR_SOLVER_EXECUTABLE:-IncNavierStokesSolver}"
 solver_processes="${NEKTAR_SOLVER_NP:-1}"
-container_runtime="${NEKTAR_CONTAINER_RUNTIME:-auto}"
 solver_workdir="${NEKTAR_SOLVER_WORKDIR:-.}"
 
 if (($# == 0)); then
@@ -30,10 +29,6 @@ EOF
     exit 2
 fi
 
-if [[ "$nektar_image" == docker://* ]]; then
-    echo "Image must not include docker://: $nektar_image" >&2
-    exit 2
-fi
 [[ "$solver_processes" =~ ^[1-9][0-9]*$ ]] || {
     echo "NEKTAR_SOLVER_NP must be a positive integer: $solver_processes" >&2
     exit 2
@@ -53,60 +48,8 @@ fi
     exit 1
 }
 
-apptainer_executable="${APPTAINER_EXECUTABLE:-}"
-if [[ -n "$apptainer_executable" && "$apptainer_executable" != */* ]]; then
-    apptainer_executable="$(command -v -- "$apptainer_executable" || true)"
-elif [[ -z "$apptainer_executable" ]]; then
-    apptainer_executable="$(command -v apptainer || true)"
-fi
-
-if [[ "$container_runtime" == auto ]]; then
-    if command -v docker >/dev/null 2>&1; then
-        container_runtime=docker
-    elif [[ -x "$apptainer_executable" ]]; then
-        container_runtime=apptainer
-    else
-        echo "Neither Docker nor Apptainer is available." >&2
-        exit 127
-    fi
-fi
-
 container_workdir="/data"
 [[ "$solver_workdir" == . ]] || container_workdir="/data/$solver_workdir"
 
-case "$container_runtime" in
-    docker)
-        command -v docker >/dev/null 2>&1 || {
-            echo "Docker is not available." >&2
-            exit 127
-        }
-        echo "Nektar solver runtime: Docker" >&2
-        echo "Nektar++ image       : $nektar_image" >&2
-        echo "Nektar solver ranks  : $solver_processes" >&2
-        exec docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --mount "type=bind,src=$project_dir,dst=/data" \
-            --workdir "$container_workdir" \
-            "$nektar_image" \
-            "${solver_command[@]}"
-        ;;
-    apptainer)
-        [[ -x "$apptainer_executable" ]] || {
-            echo "Apptainer is not available." >&2
-            exit 127
-        }
-        echo "Nektar solver runtime: Apptainer ($apptainer_executable)" >&2
-        echo "Nektar++ image       : docker://$nektar_image" >&2
-        echo "Nektar solver ranks  : $solver_processes" >&2
-        exec "$apptainer_executable" exec \
-            --cleanenv \
-            --bind "$project_dir:/data" \
-            --pwd "$container_workdir" \
-            "docker://$nektar_image" \
-            "${solver_command[@]}"
-        ;;
-    *)
-        echo "Unknown NEKTAR_CONTAINER_RUNTIME: $container_runtime" >&2
-        exit 2
-        ;;
-esac
+echo "Nektar solver ranks : $solver_processes" >&2
+run_nektar_tool "Nektar solver" "$container_workdir" "${solver_command[@]}"
