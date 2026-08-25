@@ -40,7 +40,7 @@ required_variables=(
     PERIODIC_TRANSLATION_X PERIODIC_TRANSLATION_Y PERIODIC_TRANSLATION_Z
     STAR_PERIODIC_INTERFACE
     RANS_REYNOLDS RANS_MAX_STEPS RANS_MIN_STEPS RANS_RESIDUAL_TOL
-    RANS_ALLOW_UNCONVERGED RANS_NUM_MODES
+    RANS_ALLOW_UNCONVERGED RANS_NUM_MODES UNIFORM_INFLOW
     CAD_ORDER BL_SURFACE BL_LAYERS BL_RATIO
 )
 for variable_name in "${required_variables[@]}"; do
@@ -71,18 +71,30 @@ pipeline_args=(
     --periodic-translation-y "$PERIODIC_TRANSLATION_Y"
     --periodic-translation-z "$PERIODIC_TRANSLATION_Z"
     --star-periodic-interface "$STAR_PERIODIC_INTERFACE"
-    --run-rans
-    --rans-reynolds "$RANS_REYNOLDS"
-    --rans-max-steps "$RANS_MAX_STEPS"
-    --rans-min-steps "$RANS_MIN_STEPS"
-    --rans-residual-tol "$RANS_RESIDUAL_TOL"
-    --rans-session auto
-    --rans-num-modes "$RANS_NUM_MODES"
     --cad-order "$CAD_ORDER"
     --bl-surface "$BL_SURFACE"
     --bl-layers "$BL_LAYERS"
     --bl-ratio "$BL_RATIO"
 )
+
+case "$UNIFORM_INFLOW" in
+true) ;;
+false)
+    pipeline_args+=(
+        --run-rans
+        --rans-reynolds "$RANS_REYNOLDS"
+        --rans-max-steps "$RANS_MAX_STEPS"
+        --rans-min-steps "$RANS_MIN_STEPS"
+        --rans-residual-tol "$RANS_RESIDUAL_TOL"
+        --rans-session auto
+        --rans-num-modes "$RANS_NUM_MODES"
+    )
+    ;;
+*)
+    echo "UNIFORM_INFLOW must be true or false." >&2
+    exit 2
+    ;;
+esac
 
 case "$RANS_ALLOW_UNCONVERGED" in
 true)
@@ -153,16 +165,23 @@ done
 final_mesh="nekmesh/${CASE_NAME}_p${CAD_ORDER}_bl${BL_LAYERS}.xml"
 restart_field="nekmesh/${CASE_NAME}_rans_initial.fld"
 
-printf '\n[execute] mesh/restart pipeline completed; starting Nektar++ solver\n'
-./scripts/workflow/run_nektar_solver.sh \
-    --force \
-    --mesh "$final_mesh" \
-    --restart "$restart_field" \
-    --session "$solver_session" \
-    --run-dir "$solver_run_dir" \
-    --steps "$solver_steps" \
-    --reynolds "$RANS_REYNOLDS" \
+solver_args=(
+    --force
+    --mesh "$final_mesh"
+    --session "$solver_session"
+    --run-dir "$solver_run_dir"
+    --steps "$solver_steps"
+    --reynolds "$RANS_REYNOLDS"
     --np "$processes"
+)
+if [[ "$UNIFORM_INFLOW" == true ]]; then
+    solver_args+=(--uniform-inflow)
+else
+    solver_args+=(--restart "$restart_field")
+fi
+
+printf '\n[execute] mesh pipeline completed; starting Nektar++ solver\n'
+./scripts/workflow/run_nektar_solver.sh "${solver_args[@]}"
 
 printf '\n[execute] complete: Nektar++ solver\n'
 printf '[execute] run directory: %s\n' "$solver_run_dir"

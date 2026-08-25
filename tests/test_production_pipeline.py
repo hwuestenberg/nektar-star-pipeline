@@ -143,3 +143,84 @@ def test_wall_shear_postprocess_publishes_native_shear_only() -> None:
 
     execute = (ROOT / "execute.sh").read_text(encoding="utf-8")
     assert "run_nektar_postprocess.sh" in execute
+
+
+def test_uniform_inflow_wired_through_case_env_and_execute() -> None:
+    case = (ROOT / "cases/naca0012-periodic/case.env").read_text(encoding="utf-8")
+    assert "UNIFORM_INFLOW=false" in case
+
+    execute = (ROOT / "execute.sh").read_text(encoding="utf-8")
+    assert 'case "$UNIFORM_INFLOW" in' in execute
+    assert "UNIFORM_INFLOW must be true or false." in execute
+    assert "solver_args+=(--uniform-inflow)" in execute
+    assert 'solver_args+=(--restart "$restart_field")' in execute
+
+    runner = (
+        ROOT / "scripts/workflow/run_nektar_solver.sh"
+    ).read_text(encoding="utf-8")
+    assert "--uniform-inflow" in runner
+    assert "--restart and --uniform-inflow are mutually exclusive." in runner
+    assert "materialize_uniform_inflow" in runner
+    assert 'VAR=\\"u\\" VALUE=\\"1\\"' in runner
+    assert 'VAR=\\"v\\" VALUE=\\"0\\"' in runner
+    assert 'VAR=\\"w\\" VALUE=\\"0\\"' in runner
+
+
+def test_uniform_inflow_rejects_explicit_restart() -> None:
+    result = subprocess.run(
+        [
+            str(ROOT / "scripts/workflow/run_nektar_solver.sh"),
+            "--uniform-inflow",
+            "--restart",
+            "nekmesh/naca0012_periodic_full_rans_initial.fld",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "--restart and --uniform-inflow are mutually exclusive." in result.stderr
+
+
+def test_materialize_uniform_inflow_rewrites_initial_conditions(
+    tmp_path: Path,
+) -> None:
+    # Mirrors materialize_uniform_inflow() in run_nektar_solver.sh; kept as a
+    # literal copy here rather than extracted from the script source, since
+    # extracting an awk program from surrounding bash text by string offsets
+    # is fragile. test_uniform_inflow_wired_through_case_env_and_execute
+    # separately checks the three VALUE substrings actually appear in the
+    # script, so a future edit to either copy is still caught by one test.
+    awk_program = r"""
+        /<F[[:space:]]+VAR="u,v,w"/ {
+            print "            <E VAR=\"u\" VALUE=\"1\" />"
+            print "            <E VAR=\"v\" VALUE=\"0\" />"
+            print "            <E VAR=\"w\" VALUE=\"0\" />"
+            found = 1
+            next
+        }
+        { print }
+        END {
+            if (!found) {
+                print "u,v,w restart FUNCTION entry not found" > "/dev/stderr"
+                exit 5
+            }
+        }
+    """
+    dest = tmp_path / "session.xml"
+    with (
+        (ROOT / "nektar/naca0012-periodic/session.xml").open() as source,
+        dest.open("w") as output,
+    ):
+        subprocess.run(
+            ["awk", awk_program],
+            stdin=source,
+            stdout=output,
+            check=True,
+        )
+    result = dest.read_text(encoding="utf-8")
+    assert '<E VAR="u" VALUE="1" />' in result
+    assert '<E VAR="v" VALUE="0" />' in result
+    assert '<E VAR="w" VALUE="0" />' in result
+    assert '<E VAR="p" VALUE="0" />' in result
+    assert 'FILE="restart.fld"' not in result

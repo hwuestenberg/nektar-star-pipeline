@@ -34,7 +34,10 @@ The following configuration has been exercised end to end:
 The current source uses shared nondimensional flow scaling in STAR and
 Nektar++: `U_inf=1`, `rho=1`, and `mu=nu=1/Re`. Regenerate the STAR donor and
 restart after changing `RANS_REYNOLDS`; an older restart is not rescaled in
-place.
+place. Set `UNIFORM_INFLOW=true` in `case.env` to skip the STAR RANS solve
+and its CSV-to-FLD interpolation entirely and initialize the Nektar++ solver
+with a uniform inflow (`u=1`, `v=0`, `w=0`) instead; `RANS_REYNOLDS` still
+sets the solver's `Kinvis` in that mode.
 
 STAR-CCM+ is commercial software and is not distributed by this repository.
 The STAR Java API can change between versions, so other releases may require

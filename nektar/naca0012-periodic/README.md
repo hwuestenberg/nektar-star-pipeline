@@ -16,7 +16,11 @@ The default session uses P5 velocity, P4 pressure, IMEX order 2, the periodic
 `SpanMin`/`SpanMax` pair, a no-slip wing, slip top/bottom boundaries, a fixed
 inlet and a standard pressure-pinned outlet. Velocity starts from the generated
 STAR restart; pressure starts from zero because the donor pressure is not the
-Nektar++ pressure-correction variable.
+Nektar++ pressure-correction variable. Pass `--uniform-inflow` to
+`run_nektar_solver.sh` (or set `UNIFORM_INFLOW=true` in `case.env`) to skip
+the STAR restart entirely and materialize a uniform velocity initial
+condition instead (`u=1`, `v=0`, `w=0`); `--restart` and `--uniform-inflow`
+are mutually exclusive.
 
 STAR and Nektar++ share the nondimensional convention `U_inf=1`, `rho=1`, and
 `c=1`. `run_nektar_solver.sh` reads `RANS_REYNOLDS` from the case configuration

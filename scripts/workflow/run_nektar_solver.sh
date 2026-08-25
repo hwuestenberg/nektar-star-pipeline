@@ -25,6 +25,8 @@ steps=100
 processes="${MPI_NP:-1}"
 reynolds="${RANS_REYNOLDS:-684587.012}"
 force=false
+uniform_inflow=false
+restart_explicit=false
 
 # materialize_session SRC DEST NUM_STEPS REYNOLDS
 # Writes a session XML with NumSteps and Reynolds replaced by their concrete
@@ -59,6 +61,31 @@ materialize_session() {
     ' "$src" >"$dest"
 }
 
+# materialize_uniform_inflow SRC DEST
+# Rewrites the InitialConditions FUNCTION's file-based u,v,w restart entry
+# into a uniform inflow (u=1, v=0, w=0), for runs that skip the STAR RANS
+# solve and CSV-to-FLD interpolation entirely. Pressure keeps its existing
+# zero initial condition, unaffected by this substitution.
+materialize_uniform_inflow() {
+    local src="$1" dest="$2"
+    awk '
+        /<F[[:space:]]+VAR="u,v,w"/ {
+            print "            <E VAR=\"u\" VALUE=\"1\" />"
+            print "            <E VAR=\"v\" VALUE=\"0\" />"
+            print "            <E VAR=\"w\" VALUE=\"0\" />"
+            found = 1
+            next
+        }
+        { print }
+        END {
+            if (!found) {
+                print "u,v,w restart FUNCTION entry not found" > "/dev/stderr"
+                exit 5
+            }
+        }
+    ' "$src" >"$dest"
+}
+
 usage() {
     cat <<'EOF'
 Usage: scripts/workflow/run_nektar_solver.sh [options]
@@ -71,6 +98,10 @@ shear stress and mean pressure from this run directory.
 Options:
   --mesh FILE       High-order mesh XML
   --restart FILE    Initial-condition FLD from the STAR interpolation
+                    (mutually exclusive with --uniform-inflow)
+  --uniform-inflow  Skip the restart FLD and initialize velocity with a
+                    uniform inflow instead: u=1, v=0, w=0. Use this to run
+                    without a STAR RANS solve/interpolation at all.
   --session FILE    Solver session template
   --run-dir DIR     Repository-relative run directory
   --steps N         Override NumSteps (default: 100)
@@ -96,7 +127,12 @@ while (($#)); do
         --restart)
             require_arg --restart "$#"
             restart_file="$2"
+            restart_explicit=true
             shift 2
+            ;;
+        --uniform-inflow)
+            uniform_inflow=true
+            shift
             ;;
         --session)
             require_arg --session "$#"
@@ -140,7 +176,16 @@ while (($#)); do
 done
 
 cd "$project_dir"
-for path in "$mesh_file" "$restart_file" "$session_file"; do
+if [[ "$uniform_inflow" == true ]]; then
+    [[ "$restart_explicit" != true ]] || {
+        echo "--restart and --uniform-inflow are mutually exclusive." >&2
+        exit 2
+    }
+    required_inputs=("$mesh_file" "$session_file")
+else
+    required_inputs=("$mesh_file" "$restart_file" "$session_file")
+fi
+for path in "${required_inputs[@]}"; do
     require_repo_relative_path "Input must be a repository-relative path" "$path"
     [[ -s "$path" ]] || {
         echo "Input is missing or empty: $path" >&2
@@ -175,17 +220,30 @@ if [[ "$force" == true ]]; then
 fi
 
 relative_mesh="$(realpath --relative-to="$project_dir/$run_dir" "$project_dir/$mesh_file")"
-relative_restart="$(realpath --relative-to="$project_dir/$run_dir" "$project_dir/$restart_file")"
 ln -s -- "$relative_mesh" "$run_dir/mesh.xml"
-ln -s -- "$relative_restart" "$run_dir/restart.fld"
+if [[ "$uniform_inflow" != true ]]; then
+    relative_restart="$(realpath --relative-to="$project_dir/$run_dir" "$project_dir/$restart_file")"
+    ln -s -- "$relative_restart" "$run_dir/restart.fld"
+fi
 materialize_session "$project_dir/$session_file" "$run_dir/session.xml" "$steps" "$reynolds" || {
     echo "Could not materialize NumSteps/Reynolds into the session: $session_file" >&2
     exit 1
 }
+if [[ "$uniform_inflow" == true ]]; then
+    materialize_uniform_inflow "$run_dir/session.xml" "$run_dir/session.xml.next" || {
+        echo "Could not materialize the uniform inflow into the session: $session_file" >&2
+        exit 1
+    }
+    mv -f -- "$run_dir/session.xml.next" "$run_dir/session.xml"
+fi
 
 echo "Nektar run directory : $run_dir"
 echo "Mesh                 : $mesh_file"
-echo "Restart              : $restart_file"
+if [[ "$uniform_inflow" == true ]]; then
+    echo "Initial condition    : uniform inflow (u=1, v=0, w=0)"
+else
+    echo "Restart              : $restart_file"
+fi
 echo "Session template     : $session_file"
 echo "Materialized session : $run_dir/session.xml"
 echo "Steps                : $steps"
