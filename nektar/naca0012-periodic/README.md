@@ -9,7 +9,7 @@ The retained validation outputs are:
 
 - `wing_forces.fce`, to expose force transients and boundary mistakes;
 - `modal_energy.mdl`, to expose modal-energy growth or instability;
-- `checkpoint_*.chk`, to verify checkpoint/restart output;
+- `instantaneous_*.chk`, to verify checkpoint/restart output;
 - per-step CFL and solver information in `solver.log`.
 
 The default session uses P5 velocity, P4 pressure, IMEX order 2, the periodic
