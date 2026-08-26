@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <NEKTAR>
     <EXPANSIONS>
-        <E COMPOSITE="C[0]" BASISTYPE="Modified_A,Modified_A,Modified_B" NUMMODES="5,5,5" POINTSTYPE="GaussLobattoLegendre,GaussLobattoLegendre,GaussRadauMAlpha1Beta0" NUMPOINTS="7,7,6" FIELDS="u,v,w" />
-        <E COMPOSITE="C[0]" BASISTYPE="Modified_A,Modified_A,Modified_B" NUMMODES="4,4,4" POINTSTYPE="GaussLobattoLegendre,GaussLobattoLegendre,GaussRadauMAlpha1Beta0" NUMPOINTS="7,7,6" FIELDS="p" />
-        <E COMPOSITE="C[2]" BASISTYPE="Modified_A,Modified_B,Modified_C" NUMMODES="5,5,5" POINTSTYPE="GaussLobattoLegendre,GaussRadauMAlpha1Beta0,GaussRadauMAlpha2Beta0" NUMPOINTS="7,6,6" FIELDS="u,v,w" />
-        <E COMPOSITE="C[2]" BASISTYPE="Modified_A,Modified_B,Modified_C" NUMMODES="4,4,4" POINTSTYPE="GaussLobattoLegendre,GaussRadauMAlpha1Beta0,GaussRadauMAlpha2Beta0" NUMPOINTS="7,6,6" FIELDS="p" />
+        <E COMPOSITE="C[0]" BASISTYPE="Modified_A,Modified_A,Modified_B" NUMMODES="3,3,3" POINTSTYPE="GaussLobattoLegendre,GaussLobattoLegendre,GaussRadauMAlpha1Beta0" NUMPOINTS="5,5,4" FIELDS="u,v,w" />
+        <E COMPOSITE="C[0]" BASISTYPE="Modified_A,Modified_A,Modified_B" NUMMODES="3,3,3" POINTSTYPE="GaussLobattoLegendre,GaussLobattoLegendre,GaussRadauMAlpha1Beta0" NUMPOINTS="5,5,4" FIELDS="p" />
+        <E COMPOSITE="C[2]" BASISTYPE="Modified_A,Modified_B,Modified_C" NUMMODES="3,3,3" POINTSTYPE="GaussLobattoLegendre,GaussRadauMAlpha1Beta0,GaussRadauMAlpha2Beta0" NUMPOINTS="5,4,4" FIELDS="u,v,w" />
+        <E COMPOSITE="C[2]" BASISTYPE="Modified_A,Modified_B,Modified_C" NUMMODES="3,3,3" POINTSTYPE="GaussLobattoLegendre,GaussRadauMAlpha1Beta0,GaussRadauMAlpha2Beta0" NUMPOINTS="5,4,4" FIELDS="p" />
     </EXPANSIONS>
     <CONDITIONS>
         <SOLVERINFO>
@@ -29,10 +29,10 @@
             <P> StepsPerCTU   = 25000 </P>
             <P> NumSteps      = 100 </P>
             <P> IO_CFLSteps   = 1 </P>
-            <P> Reynolds      = 684587.012 </P>
+            <P> Reynolds      = 1000 </P>
             <P> Uinf          = 1.0 </P>
             <P> Kinvis        = 1.0/Reynolds </P>
-            <P> SVVDiffCoeff  = 0.4 </P>
+            <P> SVVDiffCoeff  = 1.0 </P>
         </PARAMETERS>
         <VARIABLES>
             <V ID="0">u</V>
@@ -71,10 +71,10 @@
                 <N VAR="p" USERDEFINEDTYPE="H" VALUE="0" />
             </REGION>
             <REGION REF="1">
-                <N VAR="u" VALUE="0" />
-                <N VAR="v" VALUE="0" />
-                <N VAR="w" VALUE="0" />
-                <D VAR="p" VALUE="0" />
+                <N VAR="u" USERDEFINEDTYPE="HOutflow" VALUE="0" />
+                <N VAR="v" USERDEFINEDTYPE="HOutflow" VALUE="0" />
+                <N VAR="w" USERDEFINEDTYPE="HOutflow" VALUE="0" />
+                <D VAR="p" USERDEFINEDTYPE="HOutflow" VALUE="0" />
             </REGION>
             <REGION REF="2">
                 <P VAR="u" VALUE="[4]" />
