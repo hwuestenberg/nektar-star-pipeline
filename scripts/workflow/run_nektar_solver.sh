@@ -254,7 +254,7 @@ echo "MPI ranks            : $processes"
 solver_log="$run_dir/solver.log"
 setsid env NEKTAR_SOLVER_WORKDIR="$run_dir" NEKTAR_SOLVER_NP="$processes" \
     "$project_dir/scripts/nektar/incnavierstokes_docker.sh" \
-    -f mesh.xml session.xml >"$solver_log" 2>&1 &
+    -f -v mesh.xml session.xml >"$solver_log" 2>&1 &
 solver_pid=$!
 
 stop_solver() {
