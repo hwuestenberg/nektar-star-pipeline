@@ -122,8 +122,8 @@
             <PARAM NAME="OutputFrequency">1</PARAM>
             <PARAM NAME="Boundary">B[0]</PARAM>
         </FILTER>
-        <FILTER TYPE="ModalEnergy">
-            <PARAM NAME="OutputFile">modal_energy</PARAM>
+        <FILTER TYPE="Energy">
+            <PARAM NAME="OutputFile">energy</PARAM>
             <PARAM NAME="OutputFrequency">1</PARAM>
         </FILTER>
         <FILTER TYPE="AverageFields">
