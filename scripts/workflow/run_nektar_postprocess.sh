@@ -82,59 +82,59 @@ EOF
 
 while (($#)); do
     case "$1" in
-        --mesh)
-            require_arg --mesh "$#"
-            mesh_file="$2"
-            shift 2
-            ;;
-        --session)
-            require_arg --session "$#"
-            session_file="$2"
-            shift 2
-            ;;
-        --field)
-            require_arg --field "$#"
-            field_file="$2"
-            shift 2
-            ;;
-        --output-dir)
-            require_arg --output-dir "$#"
-            output_dir="$2"
-            shift 2
-            ;;
-        --prefix)
-            require_arg --prefix "$#"
-            prefix="$2"
-            shift 2
-            ;;
-        --boundary)
-            require_arg --boundary "$#"
-            boundary_id="$2"
-            shift 2
-            ;;
-        --surface)
-            require_arg --surface "$#"
-            surface_id="$2"
-            shift 2
-            ;;
-        --np)
-            require_arg --np "$#"
-            processes="$2"
-            shift 2
-            ;;
-        --force)
-            force=true
-            shift
-            ;;
-        -h | --help)
-            usage
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1" >&2
-            usage >&2
-            exit 2
-            ;;
+    --mesh)
+        require_arg --mesh "$#"
+        mesh_file="$2"
+        shift 2
+        ;;
+    --session)
+        require_arg --session "$#"
+        session_file="$2"
+        shift 2
+        ;;
+    --field)
+        require_arg --field "$#"
+        field_file="$2"
+        shift 2
+        ;;
+    --output-dir)
+        require_arg --output-dir "$#"
+        output_dir="$2"
+        shift 2
+        ;;
+    --prefix)
+        require_arg --prefix "$#"
+        prefix="$2"
+        shift 2
+        ;;
+    --boundary)
+        require_arg --boundary "$#"
+        boundary_id="$2"
+        shift 2
+        ;;
+    --surface)
+        require_arg --surface "$#"
+        surface_id="$2"
+        shift 2
+        ;;
+    --np)
+        require_arg --np "$#"
+        processes="$2"
+        shift 2
+        ;;
+    --force)
+        force=true
+        shift
+        ;;
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    *)
+        echo "Unknown option: $1" >&2
+        usage >&2
+        exit 2
+        ;;
     esac
 done
 
@@ -159,9 +159,18 @@ done
 }
 
 cd "$project_dir"
-[[ -s "$mesh_file" ]] || { echo "Mesh is missing or empty: $mesh_file" >&2; exit 1; }
-[[ -s "$session_file" ]] || { echo "Session is missing or empty: $session_file" >&2; exit 1; }
-[[ -e "$field_file" ]] || { echo "Field/checkpoint is missing: $field_file" >&2; exit 1; }
+[[ -s "$mesh_file" ]] || {
+    echo "Mesh is missing or empty: $mesh_file" >&2
+    exit 1
+}
+[[ -s "$session_file" ]] || {
+    echo "Session is missing or empty: $session_file" >&2
+    exit 1
+}
+[[ -e "$field_file" ]] || {
+    echo "Field/checkpoint is missing: $field_file" >&2
+    exit 1
+}
 
 mkdir -p -- "$output_dir"
 surface_xml="$output_dir/wing_surface.xml"
@@ -211,9 +220,10 @@ temporary_pressure_csv="$temporary_dir/pressure.csv"
 "$nektar_script_dir/nekmesh_docker.sh" -f -v \
     -m "extract:surf=${surface_id}" "$mesh_file" "$surface_xml"
 
+# Compute wall shear stress (wss)
 env NEKTAR_FIELDCONVERT_NP="$processes" \
     "$nektar_script_dir/fieldconvert_docker.sh" -f -v \
-    -m "wss:bnd=${boundary_id}" \
+    -m "wss:bnd=${boundary_id}:addnormals=1" \
     "$mesh_file" "$session_file" "$field_file" "$raw_request"
 
 raw_wss="$raw_request"
@@ -273,7 +283,7 @@ if [[ -f "$raw_pressure" ]]; then
     [[ -s "$raw_pressure" ]] && raw_pressure_has_data=true
 elif [[ -d "$raw_pressure" ]]; then
     raw_pressure_has_data=false
-    [[ -n "$(find "$raw_pressure" -type f -size +0c -print -quit)" ]] && \
+    [[ -n "$(find "$raw_pressure" -type f -size +0c -print -quit)" ]] &&
         raw_pressure_has_data=true
 else
     raw_pressure_has_data=false
